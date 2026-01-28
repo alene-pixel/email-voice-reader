@@ -129,29 +129,6 @@
             background: #5568d3;
         }
 
-        .listening-indicator {
-            background: #667eea;
-            color: white;
-            padding: 6px 14px;
-            border-radius: 15px;
-            font-weight: 600;
-            font-size: 13px;
-            display: none;
-            animation: pulse 2s infinite;
-            white-space: nowrap;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-
-        .listening-indicator.active {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-
         .commands {
             background: #edf2f7;
             border-radius: 12px;
@@ -350,7 +327,6 @@
     <div class="container">
         <div class="header-row">
             <h1>📧 Voice Email Reader</h1>
-            <div class="listening-indicator" id="listeningIndicator">🎤 Listening...</div>
         </div>
 
         <div id="setupSection">
@@ -536,7 +512,6 @@
                     mainSection: document.getElementById('mainSection'),
                     statusText: document.getElementById('statusText'),
                     statusDetail: document.getElementById('statusDetail'),
-                    listeningIndicator: document.getElementById('listeningIndicator'),
                     emailDisplay: document.getElementById('emailDisplay'),
                     emailFrom: document.getElementById('emailFrom'),
                     emailTo: document.getElementById('emailTo'),
@@ -571,13 +546,9 @@
                 this.elements.statusDetail.textContent = detail;
             }
 
-            // Listening indicator
+            // Listening indicator (removed - was unreliable)
             setListening(active) {
-                if (active) {
-                    this.elements.listeningIndicator.classList.add('active');
-                } else {
-                    this.elements.listeningIndicator.classList.remove('active');
-                }
+                // No-op: indicator removed per user request
             }
 
             // Email display
