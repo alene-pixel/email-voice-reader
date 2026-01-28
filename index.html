@@ -129,6 +129,29 @@
             background: #5568d3;
         }
 
+        .listening-indicator {
+            background: #667eea;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 15px;
+            font-weight: 600;
+            font-size: 13px;
+            display: none;
+            animation: pulse 2s infinite;
+            white-space: nowrap;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .listening-indicator.active {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
         .commands {
             background: #edf2f7;
             border-radius: 12px;
@@ -327,6 +350,7 @@
     <div class="container">
         <div class="header-row">
             <h1>📧 Voice Email Reader</h1>
+            <div class="listening-indicator" id="listeningIndicator">🎤 Listening...</div>
         </div>
 
         <div id="setupSection">
@@ -512,6 +536,7 @@
                     mainSection: document.getElementById('mainSection'),
                     statusText: document.getElementById('statusText'),
                     statusDetail: document.getElementById('statusDetail'),
+                    listeningIndicator: document.getElementById('listeningIndicator'),
                     emailDisplay: document.getElementById('emailDisplay'),
                     emailFrom: document.getElementById('emailFrom'),
                     emailTo: document.getElementById('emailTo'),
@@ -546,6 +571,13 @@
                 this.elements.statusDetail.textContent = detail;
             }
 
+            // Listening indicator
+            setListening(active) {
+                if (active) {
+                    this.elements.listeningIndicator.classList.add('active');
+                } else {
+                    this.elements.listeningIndicator.classList.remove('active');
+                }
             }
 
             // Email display
@@ -589,7 +621,9 @@
 
                 this.elements.emailSubject.innerHTML = `<a href="${gmailUrl}" target="_blank" style="color: #667eea; text-decoration: none;">${subject}</a>`;
                 this.elements.emailDate.textContent = this.formatDate(date);
-                this.elements.emailBody.textContent = EmailUtils.getEmailBody(email);
+                // Display email body with URLs as clickable links (shortened for readability)
+                const bodyText = EmailUtils.getEmailBody(email);
+                this.elements.emailBody.innerHTML = EmailUtils.linkifyUrls(bodyText);
                 this.elements.emailBody.scrollTop = 0;
                 this.elements.emailDisplay.classList.remove('hidden');
             }
@@ -879,6 +913,46 @@
                     return '';
                 };
                 return extract(part);
+            }
+
+            // Strip URLs from text for speech (so URLs aren't read aloud)
+            static stripUrlsForSpeech(text) {
+                // Remove URLs but keep surrounding text natural
+                // Replace URL with nothing, then clean up extra spaces
+                return text
+                    .replace(/https?:\/\/[^\s<>"]+/gi, '')
+                    .replace(/www\.[^\s<>"]+/gi, '')
+                    .replace(/\s{2,}/g, ' ')
+                    .trim();
+            }
+
+            // Convert URLs in text to clickable links for display
+            static linkifyUrls(text) {
+                // Escape HTML first to prevent XSS
+                const escaped = text
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+
+                // Convert URLs to clickable links with cleaner display
+                return escaped.replace(
+                    /(https?:\/\/[^\s<>"]+)/gi,
+                    (url) => {
+                        // Create a shorter display version of the URL
+                        let displayUrl = url;
+                        try {
+                            const parsed = new URL(url);
+                            // Show just the domain + start of path
+                            displayUrl = parsed.hostname + (parsed.pathname.length > 20
+                                ? parsed.pathname.substring(0, 20) + '...'
+                                : parsed.pathname);
+                        } catch (e) {
+                            // If URL parsing fails, truncate the raw URL
+                            displayUrl = url.length > 40 ? url.substring(0, 40) + '...' : url;
+                        }
+                        return `<a href="${url}" target="_blank" style="color: #667eea; text-decoration: underline;">${displayUrl}</a>`;
+                    }
+                );
             }
 
             static getHeader(email, name) {
@@ -1664,6 +1738,9 @@
                 }
                 this.view.showMain();
 
+                // Update listening indicator
+                this.view.setListening(m.isAuthenticated);
+
                 // Show/hide email display
                 if (m.hasEmail) {
                     const gmailUrl = `https://mail.google.com/mail/u/0/#inbox/${m.currentEmail.threadId}`;
@@ -1857,9 +1934,11 @@
                     }
                 }
 
-                const fullText = headerText + ' ' + body;
+                // Strip URLs from body for speech (so links aren't read aloud)
+                const bodyForSpeech = EmailUtils.stripUrlsForSpeech(body);
+                const fullText = headerText + ' ' + bodyForSpeech;
                 const headerWords = headerText.split(/\s+/).length;
-                const bodyWords = body.split(/\s+/).length;
+                const bodyWords = bodyForSpeech.split(/\s+/).length;
 
                 await this.speech.speakWithScroll(fullText, this.view, headerWords, bodyWords, 40);
             }
