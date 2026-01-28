@@ -1574,8 +1574,20 @@
                         isAvailable: () => m.isAuthenticated && ['idle', 'reading'].includes(m.state),
                         execute: () => this.signOut()
                     },
-
-                    
+                    // Connect button - shows when we have clientId but not authenticated
+                    {
+                        id: 'connect', icon: '🔗', label: 'Connect to Gmail',
+                        voiceMatch: (cmd) => cmd.includes('connect'),
+                        isAvailable: () => !m.isAuthenticated && m.clientId && m.state === 'idle',
+                        execute: () => this.reconnect()
+                    },
+                    // Reset button - shows when stuck or wanting to start fresh
+                    {
+                        id: 'reset', icon: '🔄', label: 'Reset Settings',
+                        voiceMatch: (cmd) => cmd.includes('reset'),
+                        isAvailable: () => !m.isAuthenticated && m.state === 'idle',
+                        execute: () => this.resetSettings()
+                    },
 
                     // Confirmation commands (for multi-step flows)
                     {
@@ -1738,8 +1750,8 @@
                 }
                 this.view.showMain();
 
-                // Update listening indicator
-                this.view.setListening(m.isAuthenticated);
+                // Update listening indicator (hide on mobile since voice often doesn't work)
+                this.view.setListening(m.isAuthenticated && !this.isMobile());
 
                 // Show/hide email display
                 if (m.hasEmail) {
@@ -1800,16 +1812,45 @@
             }
 
             // ========== INITIALIZATION ==========
+            isMobile() {
+                return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            }
+
             init() {
                 if (this.model.clientId) {
                     this.model.setState('idle');
+
+                    // Show initial status with mobile-specific message
+                    if (this.isMobile()) {
+                        this.view.updateStatus('Connecting to Gmail...', 'Note: Voice commands may not work on mobile. Use the buttons instead.');
+                    } else {
+                        this.view.updateStatus('Connecting to Gmail...');
+                    }
+
+                    // Set a timeout to show Connect button if OAuth doesn't complete
+                    const authTimeout = setTimeout(() => {
+                        if (!this.model.isAuthenticated) {
+                            this.view.updateStatus('Connection needed', 'Tap "Connect to Gmail" to sign in');
+                            this.updateView(); // Show Connect and Reset buttons
+                        }
+                    }, 3000);
+
                     this.gmail.initAuth(async () => {
+                        clearTimeout(authTimeout);
                         // Pre-fetch user email so we can say "you" instead of their address
                         await this.gmail.getMyEmail();
-                        this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
+
+                        if (this.isMobile()) {
+                            this.view.updateStatus('Connected to Gmail', 'Tap buttons below to control the app. Voice commands may not work on mobile.');
+                        } else {
+                            this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
+                        }
+
+                        this.updateView(); // Update to show Start button
+
                         setTimeout(() => {
                             this.speech.startListening();
-                            this.view.setListening(true);
+                            this.view.setListening(!this.isMobile()); // Don't show listening on mobile
                         }, 1000);
                     });
                 } else {
@@ -1826,13 +1867,34 @@
                 this.model.clientId = clientId;
                 localStorage.setItem('gmailClientId', clientId);
                 this.model.setState('idle');
+
+                // Show connecting status
+                this.view.updateStatus('Connecting to Gmail...');
+                this.updateView();
+
+                // Set timeout for failed auth
+                const authTimeout = setTimeout(() => {
+                    if (!this.model.isAuthenticated) {
+                        this.view.updateStatus('Connection needed', 'Tap "Connect to Gmail" to try again');
+                        this.updateView();
+                    }
+                }, 5000);
+
                 this.gmail.initAuth(async () => {
-                    // Pre-fetch user email so we can say "you" instead of their address
+                    clearTimeout(authTimeout);
                     await this.gmail.getMyEmail();
-                    this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
+
+                    if (this.isMobile()) {
+                        this.view.updateStatus('Connected to Gmail', 'Tap buttons below to control the app.');
+                    } else {
+                        this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
+                    }
+
+                    this.updateView();
+
                     setTimeout(() => {
                         this.speech.startListening();
-                        this.view.setListening(true);
+                        this.view.setListening(!this.isMobile());
                     }, 1000);
                 });
             }
@@ -1843,6 +1905,47 @@
                 this.model.currentEmailIndex = 0;
                 this.model.setState('setup');
                 this.view.updateStatus('Signed out', 'Please refresh and sign in again');
+            }
+
+            // Reconnect - try OAuth again
+            reconnect() {
+                this.view.updateStatus('Connecting to Gmail...');
+
+                // Set timeout for failed auth
+                const authTimeout = setTimeout(() => {
+                    if (!this.model.isAuthenticated) {
+                        this.view.updateStatus('Connection failed', 'Try again or tap "Reset Settings" to start over');
+                        this.updateView();
+                    }
+                }, 5000);
+
+                this.gmail.initAuth(async () => {
+                    clearTimeout(authTimeout);
+                    await this.gmail.getMyEmail();
+
+                    if (this.isMobile()) {
+                        this.view.updateStatus('Connected to Gmail', 'Tap buttons below to control the app.');
+                    } else {
+                        this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
+                    }
+
+                    this.updateView();
+                    setTimeout(() => {
+                        this.speech.startListening();
+                        this.view.setListening(!this.isMobile());
+                    }, 500);
+                });
+            }
+
+            // Reset all settings and start fresh
+            resetSettings() {
+                localStorage.removeItem('gmailClientId');
+                this.model.clientId = '';
+                this.model.accessToken = null;
+                this.model.emails = [];
+                this.model.currentEmailIndex = 0;
+                this.model.setState('setup');
+                this.view.updateStatus('Settings cleared', 'Please enter your Client ID again');
             }
 
             // ========== EMAIL READING ==========
