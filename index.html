@@ -546,9 +546,6 @@
                 this.elements.statusDetail.textContent = detail;
             }
 
-            // Listening indicator (removed - was unreliable)
-            setListening(active) {
-                // No-op: indicator removed per user request
             }
 
             // Email display
@@ -1666,9 +1663,6 @@
                     return;
                 }
                 this.view.showMain();
-
-                // Update listening indicator
-                this.view.setListening(m.isAuthenticated);
 
                 // Show/hide email display
                 if (m.hasEmail) {
