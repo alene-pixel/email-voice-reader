@@ -5,11 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voice Email Reader</title>
     <style>
-        * {
-listening            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * 
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -127,29 +123,6 @@ listening            margin: 0;
 
         .email-body::-webkit-scrollbar-thumb:hover {
             background: #5568d3;
-        }
-
-        .listening-indicator {
-            background: #667eea;
-            color: white;
-            padding: 6px 14px;
-            border-radius: 15px;
-            font-weight: 600;
-            font-size: 13px;
-            display: none;
-            animation: pulse 2s infinite;
-            white-space: nowrap;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-
-        .listening-indicator.active {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
         }
 
         .commands {
@@ -350,7 +323,6 @@ listening            margin: 0;
     <div class="container">
         <div class="header-row">
             <h1>📧 Voice Email Reader</h1>
-            <div class="listening-indicator" id="listeningIndicator">🎤 Listening...</div>
         </div>
 
         <div id="setupSection">
@@ -536,7 +508,6 @@ listening            margin: 0;
                     mainSection: document.getElementById('mainSection'),
                     statusText: document.getElementById('statusText'),
                     statusDetail: document.getElementById('statusDetail'),
-                    listeningIndicator: document.getElementById('listeningIndicator'),
                     emailDisplay: document.getElementById('emailDisplay'),
                     emailFrom: document.getElementById('emailFrom'),
                     emailTo: document.getElementById('emailTo'),
@@ -569,15 +540,6 @@ listening            margin: 0;
             updateStatus(text, detail = '') {
                 this.elements.statusText.textContent = text;
                 this.elements.statusDetail.textContent = detail;
-            }
-
-            // Listening indicator
-            setListening(active) {
-                if (active) {
-                    this.elements.listeningIndicator.classList.add('active');
-                } else {
-                    this.elements.listeningIndicator.classList.remove('active');
-                }
             }
 
             // Email display
@@ -1737,9 +1699,6 @@ listening            margin: 0;
                     return;
                 }
                 this.view.showMain();
-
-                // Update listening indicator
-                this.view.setListening(m.isAuthenticated);
 
                 // Show/hide email display
                 if (m.hasEmail) {
