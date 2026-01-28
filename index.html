@@ -621,9 +621,7 @@
 
                 this.elements.emailSubject.innerHTML = `<a href="${gmailUrl}" target="_blank" style="color: #667eea; text-decoration: none;">${subject}</a>`;
                 this.elements.emailDate.textContent = this.formatDate(date);
-                // Display email body with URLs as clickable links (shortened for readability)
-                const bodyText = EmailUtils.getEmailBody(email);
-                this.elements.emailBody.innerHTML = EmailUtils.linkifyUrls(bodyText);
+                this.elements.emailBody.textContent = EmailUtils.getEmailBody(email);
                 this.elements.emailBody.scrollTop = 0;
                 this.elements.emailDisplay.classList.remove('hidden');
             }
@@ -913,46 +911,6 @@
                     return '';
                 };
                 return extract(part);
-            }
-
-            // Strip URLs from text for speech (so URLs aren't read aloud)
-            static stripUrlsForSpeech(text) {
-                // Remove URLs but keep surrounding text natural
-                // Replace URL with nothing, then clean up extra spaces
-                return text
-                    .replace(/https?:\/\/[^\s<>"]+/gi, '')
-                    .replace(/www\.[^\s<>"]+/gi, '')
-                    .replace(/\s{2,}/g, ' ')
-                    .trim();
-            }
-
-            // Convert URLs in text to clickable links for display
-            static linkifyUrls(text) {
-                // Escape HTML first to prevent XSS
-                const escaped = text
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;');
-
-                // Convert URLs to clickable links with cleaner display
-                return escaped.replace(
-                    /(https?:\/\/[^\s<>"]+)/gi,
-                    (url) => {
-                        // Create a shorter display version of the URL
-                        let displayUrl = url;
-                        try {
-                            const parsed = new URL(url);
-                            // Show just the domain + start of path
-                            displayUrl = parsed.hostname + (parsed.pathname.length > 20
-                                ? parsed.pathname.substring(0, 20) + '...'
-                                : parsed.pathname);
-                        } catch (e) {
-                            // If URL parsing fails, truncate the raw URL
-                            displayUrl = url.length > 40 ? url.substring(0, 40) + '...' : url;
-                        }
-                        return `<a href="${url}" target="_blank" style="color: #667eea; text-decoration: underline;">${displayUrl}</a>`;
-                    }
-                );
             }
 
             static getHeader(email, name) {
@@ -1574,20 +1532,8 @@
                         isAvailable: () => m.isAuthenticated && ['idle', 'reading'].includes(m.state),
                         execute: () => this.signOut()
                     },
-                    // Connect button - shows when we have clientId but not authenticated
-                    {
-                        id: 'connect', icon: '🔗', label: 'Connect to Gmail',
-                        voiceMatch: (cmd) => cmd.includes('connect'),
-                        isAvailable: () => !m.isAuthenticated && m.clientId && m.state === 'idle',
-                        execute: () => this.reconnect()
-                    },
-                    // Reset button - shows when stuck or wanting to start fresh
-                    {
-                        id: 'reset', icon: '🔄', label: 'Reset Settings',
-                        voiceMatch: (cmd) => cmd.includes('reset'),
-                        isAvailable: () => !m.isAuthenticated && m.state === 'idle',
-                        execute: () => this.resetSettings()
-                    },
+
+                    
 
                     // Confirmation commands (for multi-step flows)
                     {
@@ -1750,8 +1696,8 @@
                 }
                 this.view.showMain();
 
-                // Update listening indicator (hide on mobile since voice often doesn't work)
-                this.view.setListening(m.isAuthenticated && !this.isMobile());
+                // Update listening indicator
+                this.view.setListening(m.isAuthenticated);
 
                 // Show/hide email display
                 if (m.hasEmail) {
@@ -1812,45 +1758,16 @@
             }
 
             // ========== INITIALIZATION ==========
-            isMobile() {
-                return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            }
-
             init() {
                 if (this.model.clientId) {
                     this.model.setState('idle');
-
-                    // Show initial status with mobile-specific message
-                    if (this.isMobile()) {
-                        this.view.updateStatus('Connecting to Gmail...', 'Note: Voice commands may not work on mobile. Use the buttons instead.');
-                    } else {
-                        this.view.updateStatus('Connecting to Gmail...');
-                    }
-
-                    // Set a timeout to show Connect button if OAuth doesn't complete
-                    const authTimeout = setTimeout(() => {
-                        if (!this.model.isAuthenticated) {
-                            this.view.updateStatus('Connection needed', 'Tap "Connect to Gmail" to sign in');
-                            this.updateView(); // Show Connect and Reset buttons
-                        }
-                    }, 3000);
-
                     this.gmail.initAuth(async () => {
-                        clearTimeout(authTimeout);
                         // Pre-fetch user email so we can say "you" instead of their address
                         await this.gmail.getMyEmail();
-
-                        if (this.isMobile()) {
-                            this.view.updateStatus('Connected to Gmail', 'Tap buttons below to control the app. Voice commands may not work on mobile.');
-                        } else {
-                            this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
-                        }
-
-                        this.updateView(); // Update to show Start button
-
+                        this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
                         setTimeout(() => {
                             this.speech.startListening();
-                            this.view.setListening(!this.isMobile()); // Don't show listening on mobile
+                            this.view.setListening(true);
                         }, 1000);
                     });
                 } else {
@@ -1867,34 +1784,13 @@
                 this.model.clientId = clientId;
                 localStorage.setItem('gmailClientId', clientId);
                 this.model.setState('idle');
-
-                // Show connecting status
-                this.view.updateStatus('Connecting to Gmail...');
-                this.updateView();
-
-                // Set timeout for failed auth
-                const authTimeout = setTimeout(() => {
-                    if (!this.model.isAuthenticated) {
-                        this.view.updateStatus('Connection needed', 'Tap "Connect to Gmail" to try again');
-                        this.updateView();
-                    }
-                }, 5000);
-
                 this.gmail.initAuth(async () => {
-                    clearTimeout(authTimeout);
+                    // Pre-fetch user email so we can say "you" instead of their address
                     await this.gmail.getMyEmail();
-
-                    if (this.isMobile()) {
-                        this.view.updateStatus('Connected to Gmail', 'Tap buttons below to control the app.');
-                    } else {
-                        this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
-                    }
-
-                    this.updateView();
-
+                    this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
                     setTimeout(() => {
                         this.speech.startListening();
-                        this.view.setListening(!this.isMobile());
+                        this.view.setListening(true);
                     }, 1000);
                 });
             }
@@ -1905,47 +1801,6 @@
                 this.model.currentEmailIndex = 0;
                 this.model.setState('setup');
                 this.view.updateStatus('Signed out', 'Please refresh and sign in again');
-            }
-
-            // Reconnect - try OAuth again
-            reconnect() {
-                this.view.updateStatus('Connecting to Gmail...');
-
-                // Set timeout for failed auth
-                const authTimeout = setTimeout(() => {
-                    if (!this.model.isAuthenticated) {
-                        this.view.updateStatus('Connection failed', 'Try again or tap "Reset Settings" to start over');
-                        this.updateView();
-                    }
-                }, 5000);
-
-                this.gmail.initAuth(async () => {
-                    clearTimeout(authTimeout);
-                    await this.gmail.getMyEmail();
-
-                    if (this.isMobile()) {
-                        this.view.updateStatus('Connected to Gmail', 'Tap buttons below to control the app.');
-                    } else {
-                        this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
-                    }
-
-                    this.updateView();
-                    setTimeout(() => {
-                        this.speech.startListening();
-                        this.view.setListening(!this.isMobile());
-                    }, 500);
-                });
-            }
-
-            // Reset all settings and start fresh
-            resetSettings() {
-                localStorage.removeItem('gmailClientId');
-                this.model.clientId = '';
-                this.model.accessToken = null;
-                this.model.emails = [];
-                this.model.currentEmailIndex = 0;
-                this.model.setState('setup');
-                this.view.updateStatus('Settings cleared', 'Please enter your Client ID again');
             }
 
             // ========== EMAIL READING ==========
@@ -2037,11 +1892,9 @@
                     }
                 }
 
-                // Strip URLs from body for speech (so links aren't read aloud)
-                const bodyForSpeech = EmailUtils.stripUrlsForSpeech(body);
-                const fullText = headerText + ' ' + bodyForSpeech;
+                const fullText = headerText + ' ' + body;
                 const headerWords = headerText.split(/\s+/).length;
-                const bodyWords = bodyForSpeech.split(/\s+/).length;
+                const bodyWords = body.split(/\s+/).length;
 
                 await this.speech.speakWithScroll(fullText, this.view, headerWords, bodyWords, 40);
             }
@@ -2087,7 +1940,7 @@
                 this.view.updateStatus('Marking as read...');
                 try {
                     await this.gmail.modifyEmail(this.model.currentEmail.id, [], ['UNREAD']);
-                    await this.speech.speak('Email marked as red.');
+                    await this.speech.speak('Email marked as read.');
                     this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
                     this.readCurrentEmail();
                 } catch (e) {
@@ -2360,7 +2213,7 @@
                 }
 
                 await this.gmail.modifyEmail(this.model.currentEmail.id, [], ['UNREAD']);
-                await this.speech.speak('Marked as red. Moving to next email.');
+                await this.speech.speak('Marked as read. Moving to next email.');
                 this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
                 this.readCurrentEmail();
             }
