@@ -1,0 +1,2295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Email Reader</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin: 0;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .status {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .status-text {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .status-detail {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .email-display {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .email-header {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .email-from, .email-to, .email-cc {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .email-subject {
+            font-size: 18px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .email-date {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .email-body {
+            color: #333;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 10px;
+            scroll-behavior: smooth;
+        }
+
+        .email-body::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .email-body::-webkit-scrollbar-track {
+            background: #e2e8f0;
+            border-radius: 4px;
+        }
+
+        .email-body::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 4px;
+        }
+
+        .email-body::-webkit-scrollbar-thumb:hover {
+            background: #5568d3;
+        }
+
+        .listening-indicator {
+            background: #667eea;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 15px;
+            font-weight: 600;
+            font-size: 13px;
+            display: none;
+            animation: pulse 2s infinite;
+            white-space: nowrap;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .listening-indicator.active {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .commands {
+            background: #edf2f7;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .commands h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .commands.hidden {
+            display: none;
+        }
+
+        .command-button {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-align: left;
+        }
+
+        .command-button:hover {
+            border-color: #667eea;
+            background: #f7fafc;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+
+        .command-button:active {
+            transform: translateY(0);
+        }
+
+        .command-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .command-text {
+            flex: 1;
+            line-height: 1.4;
+        }
+
+        .command-text strong {
+            color: #333;
+            font-size: 15px;
+            display: block;
+        }
+
+        .command-text small {
+            color: #718096;
+            font-size: 12px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .setup-instructions {
+            background: #fff5e1;
+            border-left: 4px solid #f6ad55;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .setup-instructions h3 {
+            color: #c05621;
+            margin-bottom: 10px;
+        }
+
+        .setup-instructions ol {
+            margin-left: 20px;
+            color: #744210;
+            line-height: 1.8;
+        }
+
+        .setup-instructions a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .setup-instructions a:hover {
+            text-decoration: underline;
+        }
+
+        .dictation-display {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .dictation-display h3 {
+            margin-bottom: 10px;
+            color: #856404;
+        }
+
+        .dictation-text {
+            color: #856404;
+            font-size: 16px;
+            line-height: 1.6;
+            min-height: 50px;
+            outline: none;
+            border: none;
+        }
+
+        .dictation-text.disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        #buttonContainer {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .forward-input-container {
+            grid-column: 1 / -1;
+        }
+
+        .forward-input-container label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .forward-input-wrapper {
+            display: flex;
+            gap: 10px;
+        }
+
+        .forward-input-wrapper input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .forward-input-wrapper input:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .recent-recipients-header {
+            grid-column: 1 / -1;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .attachments-display {
+            border-left: 4px solid #a0aec0;
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-top: 15px;
+        }
+
+        .attachments-display h4 {
+            color: #4a5568;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .attachment-item {
+            padding: 6px 0;
+            font-size: 13px;
+        }
+
+        .attachment-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .attachment-name {
+            color: #333;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-row">
+            <h1>📧 Voice Email Reader</h1>
+            <div class="listening-indicator" id="listeningIndicator">🎤 Listening...</div>
+        </div>
+
+        <div id="setupSection">
+            <div class="setup-instructions">
+                <h3>⚠️ Setup Required</h3>
+                <p style="margin-bottom: 15px;">To use this app, you need to set up Gmail API credentials:</p>
+                <ol>
+                    <li>Go to <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+                    <li>Create a new project or select an existing one</li>
+                    <li>Enable the Gmail API for your project</li>
+                    <li>Create OAuth 2.0 credentials (Web application)</li>
+                    <li>Add <code>http://localhost</code> and your domain to authorized JavaScript origins</li>
+                    <li>Add <code>http://localhost</code> and your domain to authorized redirect URIs</li>
+                    <li>Copy your Client ID and paste it below</li>
+                </ol>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="clientId" style="display: block; margin-bottom: 8px; color: #333; font-weight: 600;">
+                    Gmail API Client ID:
+                </label>
+                <input
+                    type="text"
+                    id="clientId"
+                    placeholder="123456789-abc123.apps.googleusercontent.com"
+                    style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px;"
+                />
+            </div>
+
+            <button class="command-button" style="width: 100%; justify-content: center;" onclick="app.saveClientId()">
+                <span class="command-icon">🔗</span>
+                <span class="command-text"><strong>Save & Connect to Gmail</strong></span>
+            </button>
+        </div>
+
+        <div id="mainSection" class="hidden">
+            <div class="status">
+                <div class="status-text" id="statusText">Ready to start</div>
+                <div class="status-detail" id="statusDetail">Click or say "Start Reading Emails" to begin</div>
+            </div>
+
+            <div id="dictationDisplay" class="dictation-display hidden">
+                <h3>✍️ Your Message:</h3>
+                <div id="dictationText" class="dictation-text" contenteditable="true"></div>
+            </div>
+
+            <div id="emailDisplay" class="email-display hidden">
+                <div class="email-header">
+                    <div class="email-from" id="emailFrom"></div>
+                    <div class="email-to" id="emailTo"></div>
+                    <div class="email-cc" id="emailCc"></div>
+                    <div class="email-subject" id="emailSubject"></div>
+                    <div class="email-date" id="emailDate"></div>
+                </div>
+                <div class="email-body" id="emailBody"></div>
+                <div id="attachmentsDisplay" class="attachments-display hidden">
+                    <h4>📎 Attachments:</h4>
+                    <div id="attachmentsList"></div>
+                </div>
+            </div>
+
+            <div class="commands" id="commandsSection">
+                <h3>📣 Voice Commands / Click to Use:</h3>
+                <div id="buttonContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script>
+        // Configure pdf.js worker
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+    </script>
+    <script>
+        // ============================================================
+        // EMAIL VOICE READER - MVC ARCHITECTURE (Version 4.0)
+        // ============================================================
+        console.log('=== EMAIL VOICE READER VERSION 4.0 (MVC) LOADED ===');
+
+        // ============================================================
+        // MODEL - All application state lives here
+        // ============================================================
+        class EmailReaderModel {
+            constructor() {
+                // Authentication
+                this.clientId = localStorage.getItem('gmailClientId') || '';
+                this.accessToken = null;
+                this.userEmail = null;
+
+                // Email state
+                this.emails = [];
+                this.currentEmailIndex = 0;
+                this.seenEmailIds = new Set();
+
+                // App state - simple string describing what's happening
+                // Possible states: 'setup', 'idle', 'loading', 'reading', 'dictating',
+                //                  'confirming-reply-type', 'confirming-send', 'confirming-forward-recipient',
+                //                  'confirming-forward', 'confirming-forward-message'
+                this.state = 'setup';
+
+                // Pending action data (for multi-step flows like reply/forward)
+                this.pendingAction = null;
+
+                // Dictation state
+                this.dictatedText = '';
+                this.isDictationEditable = true;
+
+                // Forward-specific state
+                this.recentRecipients = null;
+                this.selectedForwardRecipient = null;
+
+                // Reply-specific state
+                this.isReplyAll = false;
+
+                // Listeners for state changes
+                this.listeners = [];
+            }
+
+            // Subscribe to state changes
+            onChange(callback) {
+                this.listeners.push(callback);
+            }
+
+            // Notify all listeners of state change
+            notify() {
+                this.listeners.forEach(cb => cb(this));
+            }
+
+            // State setters that auto-notify
+            setState(newState) {
+                console.log(`State: ${this.state} → ${newState}`);
+                this.state = newState;
+                this.notify();
+            }
+
+            setAccessToken(token) {
+                this.accessToken = token;
+                this.notify();
+            }
+
+            setEmails(emails) {
+                this.emails = emails;
+                this.notify();
+            }
+
+            setCurrentEmailIndex(index) {
+                this.currentEmailIndex = index;
+                this.notify();
+            }
+
+            get currentEmail() {
+                return this.emails[this.currentEmailIndex] || null;
+            }
+
+            get hasEmail() {
+                return this.currentEmail !== null;
+            }
+
+            get isAuthenticated() {
+                return this.accessToken !== null;
+            }
+
+            get hasMoreEmails() {
+                return this.currentEmailIndex < this.emails.length - 1;
+            }
+
+            get canGoPrevious() {
+                return this.currentEmailIndex > 0;
+            }
+        }
+
+        // ============================================================
+        // VIEW - All DOM manipulation lives here
+        // ============================================================
+        class EmailReaderView {
+            constructor() {
+                this.elements = {
+                    setupSection: document.getElementById('setupSection'),
+                    mainSection: document.getElementById('mainSection'),
+                    statusText: document.getElementById('statusText'),
+                    statusDetail: document.getElementById('statusDetail'),
+                    listeningIndicator: document.getElementById('listeningIndicator'),
+                    emailDisplay: document.getElementById('emailDisplay'),
+                    emailFrom: document.getElementById('emailFrom'),
+                    emailTo: document.getElementById('emailTo'),
+                    emailCc: document.getElementById('emailCc'),
+                    emailSubject: document.getElementById('emailSubject'),
+                    emailDate: document.getElementById('emailDate'),
+                    emailBody: document.getElementById('emailBody'),
+                    dictationDisplay: document.getElementById('dictationDisplay'),
+                    dictationText: document.getElementById('dictationText'),
+                    buttonContainer: document.getElementById('buttonContainer'),
+                    commandsSection: document.getElementById('commandsSection'),
+                    clientIdInput: document.getElementById('clientId'),
+                    attachmentsDisplay: document.getElementById('attachmentsDisplay'),
+                    attachmentsList: document.getElementById('attachmentsList')
+                };
+            }
+
+            // Show/hide setup vs main sections
+            showSetup() {
+                this.elements.setupSection.classList.remove('hidden');
+                this.elements.mainSection.classList.add('hidden');
+            }
+
+            showMain() {
+                this.elements.setupSection.classList.add('hidden');
+                this.elements.mainSection.classList.remove('hidden');
+            }
+
+            // Update status display
+            updateStatus(text, detail = '') {
+                this.elements.statusText.textContent = text;
+                this.elements.statusDetail.textContent = detail;
+            }
+
+            // Listening indicator
+            setListening(active) {
+                if (active) {
+                    this.elements.listeningIndicator.classList.add('active');
+                } else {
+                    this.elements.listeningIndicator.classList.remove('active');
+                }
+            }
+
+            // Email display
+            showEmail(email, gmailUrl, userEmail = null) {
+                if (!email || !email.payload || !email.payload.headers) {
+                    this.elements.emailFrom.textContent = 'Error loading email';
+                    this.elements.emailSubject.textContent = 'Could not load this email';
+                    this.elements.emailDate.textContent = '';
+                    this.elements.emailBody.textContent = 'This email could not be loaded.';
+                    this.elements.emailDisplay.classList.remove('hidden');
+                    return;
+                }
+
+                const headers = email.payload.headers;
+                const fromRaw = this.getHeader(headers, 'From') || 'Unknown';
+                const toRaw = this.getHeader(headers, 'To') || '';
+                const ccRaw = this.getHeader(headers, 'Cc') || this.getHeader(headers, 'cc') || '';
+                const subject = this.getHeader(headers, 'Subject') || 'No subject';
+                const date = this.getHeader(headers, 'Date') || '';
+
+                // Replace user's email with "you" for cleaner display
+                const from = EmailUtils.replaceUserEmail(fromRaw, userEmail);
+                const to = EmailUtils.replaceUserEmail(toRaw, userEmail);
+                const cc = EmailUtils.replaceUserEmail(ccRaw, userEmail);
+
+                this.elements.emailFrom.textContent = `From: ${from}`;
+
+                if (to) {
+                    this.elements.emailTo.textContent = `To: ${to}`;
+                    this.elements.emailTo.style.display = 'block';
+                } else {
+                    this.elements.emailTo.style.display = 'none';
+                }
+
+                if (cc) {
+                    this.elements.emailCc.textContent = `CC: ${cc}`;
+                    this.elements.emailCc.style.display = 'block';
+                } else {
+                    this.elements.emailCc.style.display = 'none';
+                }
+
+                this.elements.emailSubject.innerHTML = `<a href="${gmailUrl}" target="_blank" style="color: #667eea; text-decoration: none;">${subject}</a>`;
+                this.elements.emailDate.textContent = this.formatDate(date);
+                this.elements.emailBody.textContent = EmailUtils.getEmailBody(email);
+                this.elements.emailBody.scrollTop = 0;
+                this.elements.emailDisplay.classList.remove('hidden');
+            }
+
+            hideEmail() {
+                this.elements.emailDisplay.classList.add('hidden');
+            }
+
+            // Attachments display
+            showAttachments(attachments) {
+                if (!attachments || attachments.length === 0) {
+                    this.elements.attachmentsDisplay.classList.add('hidden');
+                    return;
+                }
+
+                this.elements.attachmentsList.innerHTML = '';
+
+                attachments.forEach(att => {
+                    const item = document.createElement('div');
+                    item.className = 'attachment-item';
+                    item.innerHTML = `<span class="attachment-name">${att.filename}</span>`;
+                    this.elements.attachmentsList.appendChild(item);
+                });
+
+                this.elements.attachmentsDisplay.classList.remove('hidden');
+            }
+
+            hideAttachments() {
+                this.elements.attachmentsDisplay.classList.add('hidden');
+            }
+
+            getAttachmentIcon(filename) {
+                const ext = filename.split('.').pop().toLowerCase();
+                const icons = {
+                    'pdf': '📕',
+                    'doc': '📘', 'docx': '📘',
+                    'xls': '📗', 'xlsx': '📗',
+                    'ppt': '📙', 'pptx': '📙',
+                    'txt': '📄', 'md': '📄', 'csv': '📄',
+                    'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️',
+                    'zip': '🗜️', 'rar': '🗜️',
+                    'mp3': '🎵', 'wav': '🎵',
+                    'mp4': '🎬', 'mov': '🎬'
+                };
+                return icons[ext] || '📎';
+            }
+
+            getHeader(headers, name) {
+                const header = headers.find(h => h.name.toLowerCase() === name.toLowerCase());
+                return header ? header.value : null;
+            }
+
+            formatDate(dateString) {
+                if (!dateString) return '';
+                try {
+                    const date = new Date(dateString);
+                    const options = {
+                        weekday: 'short', month: 'short', day: 'numeric',
+                        year: 'numeric', hour: 'numeric', minute: '2-digit',
+                        hour12: true, timeZone: 'America/Los_Angeles'
+                    };
+                    return date.toLocaleString('en-US', options) + ' PT';
+                } catch (e) {
+                    return dateString;
+                }
+            }
+
+            // Dictation display
+            showDictation(text = '', editable = true) {
+                this.elements.dictationText.innerHTML = text;
+                this.elements.dictationText.contentEditable = editable ? 'true' : 'false';
+                if (editable) {
+                    this.elements.dictationText.classList.remove('disabled');
+                } else {
+                    this.elements.dictationText.classList.add('disabled');
+                }
+                this.elements.dictationDisplay.classList.remove('hidden');
+            }
+
+            hideDictation() {
+                this.elements.dictationDisplay.classList.add('hidden');
+            }
+
+            getDictationText() {
+                return this.elements.dictationText.innerText.trim();
+            }
+
+            setDictationText(text) {
+                this.elements.dictationText.innerText = text;
+            }
+
+            appendDictationText(text) {
+                const existing = this.getDictationText();
+                this.setDictationText(existing ? existing + ' ' + text : text);
+            }
+
+            // Command buttons - the key innovation!
+            // This renders buttons for ALL available commands automatically
+            renderCommands(commands) {
+                this.elements.buttonContainer.innerHTML = '';
+
+                if (commands.length === 0) {
+                    this.elements.commandsSection.classList.add('hidden');
+                    return;
+                }
+
+                this.elements.commandsSection.classList.remove('hidden');
+
+                commands.forEach(cmd => {
+                    if (cmd.type === 'button') {
+                        const button = document.createElement('button');
+                        button.className = 'command-button';
+                        button.onclick = () => cmd.execute();
+                        button.innerHTML = `
+                            <span class="command-icon">${cmd.icon}</span>
+                            <span class="command-text">
+                                <strong>${cmd.label}</strong>
+                                ${cmd.sublabel ? `<small>${cmd.sublabel}</small>` : ''}
+                            </span>
+                        `;
+                        this.elements.buttonContainer.appendChild(button);
+                    } else if (cmd.type === 'header') {
+                        const header = document.createElement('div');
+                        header.className = 'recent-recipients-header';
+                        header.textContent = cmd.text;
+                        this.elements.buttonContainer.appendChild(header);
+                    } else if (cmd.type === 'email-input') {
+                        const container = document.createElement('div');
+                        container.className = 'forward-input-container';
+                        container.innerHTML = `
+                            <label>✏️ Or type an email address:</label>
+                            <div class="forward-input-wrapper">
+                                <input type="email" id="forwardEmailInput" placeholder="someone@example.com" />
+                                <button class="command-button" style="flex-shrink: 0;">
+                                    <span class="command-icon">✓</span>
+                                    <span class="command-text"><strong>Use This</strong></span>
+                                </button>
+                            </div>
+                        `;
+                        this.elements.buttonContainer.appendChild(container);
+
+                        // Wire up the button and enter key
+                        const input = container.querySelector('input');
+                        const useButton = container.querySelector('button');
+                        useButton.onclick = () => {
+                            const email = input.value.trim();
+                            if (email && email.includes('@')) {
+                                cmd.onSubmit(email);
+                            } else {
+                                input.style.borderColor = '#f56565';
+                                setTimeout(() => input.style.borderColor = '#e2e8f0', 2000);
+                            }
+                        };
+                        input.onkeypress = (e) => {
+                            if (e.key === 'Enter') useButton.click();
+                        };
+                    }
+                });
+            }
+
+            // Auto-scroll email body during speech
+            startAutoScroll(totalDurationMs) {
+                const el = this.elements.emailBody;
+                const totalDistance = el.scrollHeight - el.clientHeight;
+                if (totalDistance <= 0) return null;
+
+                const intervalMs = 50;
+                const step = totalDistance / (totalDurationMs / intervalMs);
+                let current = 0;
+
+                return setInterval(() => {
+                    current += step;
+                    el.scrollTop = Math.min(current, totalDistance);
+                    if (current >= totalDistance) {
+                        clearInterval(this.scrollInterval);
+                    }
+                }, intervalMs);
+            }
+        }
+
+        // ============================================================
+        // EMAIL UTILITIES - Static helper functions
+        // ============================================================
+        class EmailUtils {
+            // Replace user's email address with "you" in address strings
+            static replaceUserEmail(addressString, userEmail) {
+                if (!userEmail || !addressString) return addressString;
+
+                // Create case-insensitive regex to match the user's email
+                const emailRegex = new RegExp(userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+
+                // Handle formats like "Name <email>" or just "email"
+                // Replace "Name <user@email.com>" with "you"
+                // Replace "user@email.com" with "you"
+                const result = addressString.split(',').map(addr => {
+                    addr = addr.trim();
+                    if (emailRegex.test(addr)) {
+                        return 'you';
+                    }
+                    return addr;
+                }).join(', ');
+
+                return result;
+            }
+
+            static decodeBase64UTF8(base64) {
+                try {
+                    const binary = atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) {
+                        bytes[i] = binary.charCodeAt(i);
+                    }
+                    return new TextDecoder('utf-8').decode(bytes);
+                } catch (e) {
+                    return atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
+                }
+            }
+
+            static getEmailBody(email) {
+                let body = '';
+
+                if (email.payload) {
+                    try {
+                        if (email.payload.body && email.payload.body.data) {
+                            body = this.decodeBase64UTF8(email.payload.body.data);
+                        } else if (email.payload.parts) {
+                            let plainPart = null, htmlPart = null;
+
+                            const findParts = (parts) => {
+                                for (let part of parts) {
+                                    if (part.mimeType === 'text/plain' && part.body?.data) plainPart = part;
+                                    if (part.mimeType === 'text/html' && part.body?.data) htmlPart = part;
+                                    if (part.parts) findParts(part.parts);
+                                }
+                            };
+
+                            findParts(email.payload.parts);
+                            const partToUse = plainPart || htmlPart;
+                            if (partToUse) {
+                                body = this.decodeBase64UTF8(partToUse.body.data);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error extracting body:', e);
+                    }
+                }
+
+                if (!body && email.snippet) body = email.snippet;
+                if (!body) return 'This email has no readable text content.';
+
+                // Clean HTML/CSS
+                body = body.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+                body = body.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+                body = body.replace(/<[^>]*>/g, '');
+                body = body.replace(/\{[^}]*\}/g, '');
+                body = body.replace(/[a-z-]+\s*:\s*[^;]+\s*!important\s*;?/gi, '');
+                // Decode HTML entities (both named like &nbsp; and numeric like &#847; or &#x20;)
+                body = body.replace(/&#(\d+);/g, (match, dec) => {
+                    const char = String.fromCharCode(dec);
+                    // Replace zero-width/invisible characters with nothing
+                    if (dec < 32 || (dec >= 127 && dec <= 159) || dec === 847 || dec === 8203 || dec === 8204 || dec === 8205) {
+                        return '';
+                    }
+                    return char;
+                });
+                body = body.replace(/&#x([0-9a-f]+);/gi, (match, hex) => {
+                    const dec = parseInt(hex, 16);
+                    if (dec < 32 || (dec >= 127 && dec <= 159) || dec === 847 || dec === 8203 || dec === 8204 || dec === 8205) {
+                        return '';
+                    }
+                    return String.fromCharCode(dec);
+                });
+                body = body.replace(/&nbsp;/gi, ' ');
+                body = body.replace(/&amp;/gi, '&');
+                body = body.replace(/&lt;/gi, '<');
+                body = body.replace(/&gt;/gi, '>');
+                body = body.replace(/&quot;/gi, '"');
+                body = body.replace(/&[a-z]+;/gi, ' '); // Any remaining named entities
+                body = body.replace(/\s+/g, ' ');
+                return body.trim() || 'This email has no text content.';
+            }
+
+            static extractFullBody(part) {
+                const extract = (p) => {
+                    if (p.body && p.body.data) return this.decodeBase64UTF8(p.body.data);
+                    if (p.parts) return p.parts.map(extract).join('');
+                    return '';
+                };
+                return extract(part);
+            }
+
+            static getHeader(email, name) {
+                const header = email.payload?.headers?.find(h => h.name.toLowerCase() === name.toLowerCase());
+                return header ? header.value : '';
+            }
+
+            static encodeEmail(emailText) {
+                return btoa(unescape(encodeURIComponent(emailText)))
+                    .replace(/\+/g, '-')
+                    .replace(/\//g, '_')
+                    .replace(/=+$/, '');
+            }
+
+            // Get list of attachments from email
+            static getAttachments(email) {
+                const attachments = [];
+
+                const findAttachments = (parts) => {
+                    if (!parts) return;
+                    for (const part of parts) {
+                        // Check if this part is an attachment
+                        if (part.filename && part.filename.length > 0 && part.body) {
+                            attachments.push({
+                                filename: part.filename,
+                                mimeType: part.mimeType || 'application/octet-stream',
+                                size: part.body.size || 0,
+                                attachmentId: part.body.attachmentId
+                            });
+                        }
+                        // Recursively check nested parts
+                        if (part.parts) {
+                            findAttachments(part.parts);
+                        }
+                    }
+                };
+
+                if (email.payload) {
+                    // Check root level
+                    if (email.payload.filename && email.payload.body?.attachmentId) {
+                        attachments.push({
+                            filename: email.payload.filename,
+                            mimeType: email.payload.mimeType || 'application/octet-stream',
+                            size: email.payload.body.size || 0,
+                            attachmentId: email.payload.body.attachmentId
+                        });
+                    }
+                    // Check parts
+                    findAttachments(email.payload.parts);
+                }
+
+                return attachments;
+            }
+
+            // Check if attachment is readable (text, PDF, or Word)
+            static isReadableAttachment(attachment) {
+                const filename = attachment.filename.toLowerCase();
+                const mimeType = attachment.mimeType.toLowerCase();
+
+                return filename.endsWith('.txt') ||
+                       filename.endsWith('.pdf') ||
+                       filename.endsWith('.md') ||
+                       filename.endsWith('.csv') ||
+                       filename.endsWith('.docx') ||
+                       mimeType === 'text/plain' ||
+                       mimeType === 'text/csv' ||
+                       mimeType === 'text/markdown' ||
+                       mimeType === 'application/pdf' ||
+                       mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            }
+
+            // Get human-readable file size
+            static formatFileSize(bytes) {
+                if (bytes < 1024) return bytes + ' bytes';
+                if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+                return Math.round(bytes / (1024 * 1024) * 10) / 10 + ' MB';
+            }
+        }
+
+        // ============================================================
+        // SPEECH SERVICE - Text-to-speech and speech recognition
+        // ============================================================
+        class SpeechService {
+            constructor() {
+                this.synthesis = window.speechSynthesis;
+                this.recognition = null;
+                this.currentUtterance = null;
+                this.onCommand = null; // Callback when voice command is heard
+                this.scrollInterval = null;
+                this.scrollTimeout = null;
+
+                this.initRecognition();
+            }
+
+            initRecognition() {
+                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    this.recognition = new SpeechRecognition();
+                    this.recognition.continuous = false;
+                    this.recognition.interimResults = false;
+                    this.recognition.lang = 'en-US';
+
+                    this.recognition.onresult = (event) => {
+                        const command = event.results[0][0].transcript.toLowerCase().trim();
+                        console.log('Heard:', command);
+                        this.cancel(); // Stop any ongoing speech
+                        if (this.onCommand) this.onCommand(command);
+                    };
+
+                    this.recognition.onerror = (event) => {
+                        console.error('Speech recognition error:', event.error);
+                    };
+
+                    this.recognition.onend = () => {
+                        // Always restart listening
+                        setTimeout(() => this.startListening(), 100);
+                    };
+                }
+            }
+
+            startListening() {
+                if (this.recognition) {
+                    try {
+                        this.recognition.start();
+                        return true;
+                    } catch (e) {
+                        // Already started
+                        return false;
+                    }
+                }
+                return false;
+            }
+
+            speak(text, onStart = null, onEnd = null) {
+                return new Promise((resolve) => {
+                    if (this.synthesis.paused) this.synthesis.resume();
+                    this.synthesis.cancel();
+
+                    setTimeout(() => {
+                        this.currentUtterance = new SpeechSynthesisUtterance(text);
+                        this.currentUtterance.rate = 1.0;
+                        this.currentUtterance.pitch = 1.0;
+                        this.currentUtterance.volume = 1.0;
+
+                        this.currentUtterance.onstart = () => {
+                            if (onStart) onStart();
+                        };
+
+                        this.currentUtterance.onend = () => {
+                            if (onEnd) onEnd();
+                            resolve();
+                        };
+
+                        this.currentUtterance.onerror = () => resolve();
+
+                        this.synthesis.speak(this.currentUtterance);
+
+                        // Chrome bug workaround
+                        setTimeout(() => {
+                            if (this.synthesis.paused) this.synthesis.resume();
+                        }, 100);
+                    }, 100);
+                });
+            }
+
+            // Speak with auto-scroll timing
+            speakWithScroll(text, view, headerWordCount, bodyWordCount, scrollDelayWords) {
+                return new Promise((resolve) => {
+                    if (this.synthesis.paused) this.synthesis.resume();
+                    this.synthesis.cancel();
+
+                    setTimeout(() => {
+                        this.currentUtterance = new SpeechSynthesisUtterance(text);
+                        this.currentUtterance.rate = 1.0;
+
+                        this.currentUtterance.onstart = () => {
+                            if (bodyWordCount > 0) {
+                                const wordsPerSecond = 2.5;
+                                const headerDurationMs = (headerWordCount / wordsPerSecond) * 1000;
+                                const scrollDelayDurationMs = (scrollDelayWords / wordsPerSecond) * 1000;
+                                const totalDelayMs = headerDurationMs + scrollDelayDurationMs;
+                                const remainingBodyDurationMs = ((bodyWordCount - scrollDelayWords) / wordsPerSecond) * 1000;
+
+                                this.scrollTimeout = setTimeout(() => {
+                                    this.scrollInterval = view.startAutoScroll(remainingBodyDurationMs);
+                                }, totalDelayMs);
+                            }
+                        };
+
+                        this.currentUtterance.onend = () => {
+                            this.clearScrollTimers();
+                            resolve();
+                        };
+
+                        this.currentUtterance.onerror = () => {
+                            this.clearScrollTimers();
+                            resolve();
+                        };
+
+                        this.synthesis.speak(this.currentUtterance);
+                        setTimeout(() => {
+                            if (this.synthesis.paused) this.synthesis.resume();
+                        }, 100);
+                    }, 100);
+                });
+            }
+
+            clearScrollTimers() {
+                if (this.scrollInterval) clearInterval(this.scrollInterval);
+                if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
+                this.scrollInterval = null;
+                this.scrollTimeout = null;
+            }
+
+            cancel() {
+                this.clearScrollTimers();
+                if (this.synthesis) this.synthesis.cancel();
+            }
+
+            get isSpeaking() {
+                return this.synthesis.speaking;
+            }
+        }
+
+        // ============================================================
+        // GMAIL SERVICE - All Gmail API calls
+        // ============================================================
+        class GmailService {
+            constructor(model) {
+                this.model = model;
+                this.SCOPES = 'https://www.googleapis.com/auth/gmail.modify';
+            }
+
+            async fetchWithAuth(url, options = {}) {
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'Authorization': `Bearer ${this.model.accessToken}`,
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+                return response;
+            }
+
+            async fetchUnreadEmails(maxResults = 10) {
+                const response = await this.fetchWithAuth(
+                    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread in:inbox&maxResults=${maxResults}`
+                );
+                const data = await response.json();
+                if (!data.messages) return [];
+
+                const emails = [];
+                for (let msg of data.messages) {
+                    try {
+                        const emailResponse = await this.fetchWithAuth(
+                            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`
+                        );
+                        if (emailResponse.ok) {
+                            emails.push(await emailResponse.json());
+                        }
+                        await new Promise(r => setTimeout(r, 100)); // Rate limit
+                    } catch (e) {
+                        console.error(`Error fetching email ${msg.id}:`, e);
+                    }
+                }
+                return emails;
+            }
+
+            async modifyEmail(emailId, addLabels = [], removeLabels = []) {
+                const body = {};
+                if (addLabels.length) body.addLabelIds = addLabels;
+                if (removeLabels.length) body.removeLabelIds = removeLabels;
+
+                await this.fetchWithAuth(
+                    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${emailId}/modify`,
+                    { method: 'POST', body: JSON.stringify(body) }
+                );
+            }
+
+            async sendEmail(rawEmail, threadId = null) {
+                const body = { raw: EmailUtils.encodeEmail(rawEmail) };
+                if (threadId) body.threadId = threadId;
+
+                await this.fetchWithAuth(
+                    'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+                    { method: 'POST', body: JSON.stringify(body) }
+                );
+            }
+
+            async getMyEmail() {
+                if (this.model.userEmail) return this.model.userEmail;
+                const response = await this.fetchWithAuth(
+                    'https://gmail.googleapis.com/gmail/v1/users/me/profile'
+                );
+                const data = await response.json();
+                this.model.userEmail = data.emailAddress || '';
+                return this.model.userEmail;
+            }
+
+            async getRecentRecipients(maxResults = 6) {
+                if (this.model.recentRecipients) return this.model.recentRecipients;
+
+                try {
+                    const response = await this.fetchWithAuth(
+                        `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=in:sent&maxResults=20`
+                    );
+                    const data = await response.json();
+                    if (!data.messages) return [];
+
+                    const recipients = new Set();
+                    const myEmail = await this.getMyEmail();
+
+                    for (let msg of data.messages) {
+                        if (recipients.size >= maxResults) break;
+                        try {
+                            const emailResponse = await this.fetchWithAuth(
+                                `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=To&metadataHeaders=Cc`
+                            );
+                            if (emailResponse.ok) {
+                                const email = await emailResponse.json();
+                                const to = EmailUtils.getHeader(email, 'To');
+                                const cc = EmailUtils.getHeader(email, 'Cc');
+
+                                (to + ',' + cc).split(',')
+                                    .map(addr => addr.trim())
+                                    .filter(addr => addr && !addr.toLowerCase().includes(myEmail.toLowerCase()))
+                                    .forEach(addr => {
+                                        if (recipients.size < maxResults) {
+                                            const match = addr.match(/<([^>]+)>/);
+                                            if ((match ? match[1] : addr).includes('@')) {
+                                                recipients.add(addr);
+                                            }
+                                        }
+                                    });
+                            }
+                            await new Promise(r => setTimeout(r, 50));
+                        } catch (e) {}
+                    }
+
+                    this.model.recentRecipients = Array.from(recipients);
+                    return this.model.recentRecipients;
+                } catch (e) {
+                    return [];
+                }
+            }
+
+            async searchForEmail(name) {
+                try {
+                    const response = await this.fetchWithAuth(
+                        `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(name)}&maxResults=10`
+                    );
+                    const data = await response.json();
+                    if (!data.messages) return null;
+
+                    const msgResponse = await this.fetchWithAuth(
+                        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${data.messages[0].id}?format=full`
+                    );
+                    const message = await msgResponse.json();
+
+                    const to = EmailUtils.getHeader(message, 'To');
+                    const from = EmailUtils.getHeader(message, 'From');
+                    const match = (to + ' ' + from).match(/[\w\.-]+@[\w\.-]+\.\w+/);
+                    return match ? match[0] : null;
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            initAuth(onSuccess) {
+                google.accounts.id.initialize({
+                    client_id: this.model.clientId,
+                    callback: () => {}
+                });
+
+                const tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: this.model.clientId,
+                    scope: this.SCOPES,
+                    callback: (response) => {
+                        if (response.access_token) {
+                            this.model.setAccessToken(response.access_token);
+                            onSuccess();
+                        }
+                    }
+                });
+
+                tokenClient.requestAccessToken();
+            }
+
+            signOut() {
+                google.accounts.id.disableAutoSelect();
+                this.model.setAccessToken(null);
+            }
+
+            // Fetch attachment data
+            async getAttachment(messageId, attachmentId) {
+                const response = await this.fetchWithAuth(
+                    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`
+                );
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.data; // Base64 encoded attachment data
+                }
+                return null;
+            }
+
+            // Extract text from attachment
+            async extractAttachmentText(messageId, attachment) {
+                const base64Data = await this.getAttachment(messageId, attachment.attachmentId);
+                if (!base64Data) {
+                    return { success: false, error: 'Could not download attachment' };
+                }
+
+                const filename = attachment.filename.toLowerCase();
+                const mimeType = attachment.mimeType.toLowerCase();
+
+                try {
+                    // Handle text files
+                    if (filename.endsWith('.txt') || filename.endsWith('.md') || filename.endsWith('.csv') ||
+                        mimeType === 'text/plain' || mimeType === 'text/csv' || mimeType === 'text/markdown') {
+                        const text = EmailUtils.decodeBase64UTF8(base64Data);
+                        return { success: true, text: text };
+                    }
+
+                    // Handle PDF files
+                    if (filename.endsWith('.pdf') || mimeType === 'application/pdf') {
+                        return await this.extractPdfText(base64Data);
+                    }
+
+                    // Handle Word documents (.docx)
+                    if (filename.endsWith('.docx') ||
+                        mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+                        return await this.extractDocxText(base64Data);
+                    }
+
+                    return { success: false, error: 'Unsupported file type' };
+                } catch (e) {
+                    console.error('Error extracting attachment text:', e);
+                    return { success: false, error: 'Failed to read attachment' };
+                }
+            }
+
+            // Extract text from PDF using pdf.js
+            async extractPdfText(base64Data) {
+                try {
+                    // Check if pdf.js is loaded
+                    if (typeof pdfjsLib === 'undefined') {
+                        return { success: false, error: 'PDF reader not available' };
+                    }
+
+                    // Convert base64 to Uint8Array
+                    const binaryString = atob(base64Data.replace(/-/g, '+').replace(/_/g, '/'));
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+
+                    // Load the PDF
+                    const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+                    let fullText = '';
+
+                    // Extract text from each page
+                    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                        const page = await pdf.getPage(pageNum);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(' ');
+                        fullText += pageText + '\n\n';
+                    }
+
+                    if (fullText.trim().length === 0) {
+                        return { success: false, error: 'PDF appears to be image-based or empty. Cannot extract text.' };
+                    }
+
+                    return { success: true, text: fullText.trim() };
+                } catch (e) {
+                    console.error('PDF extraction error:', e);
+                    return { success: false, error: 'Failed to read PDF file' };
+                }
+            }
+
+            // Extract text from Word document using mammoth.js
+            async extractDocxText(base64Data) {
+                try {
+                    // Check if mammoth is loaded
+                    if (typeof mammoth === 'undefined') {
+                        return { success: false, error: 'Word document reader not available' };
+                    }
+
+                    // Convert base64 to ArrayBuffer
+                    const binaryString = atob(base64Data.replace(/-/g, '+').replace(/_/g, '/'));
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    const arrayBuffer = bytes.buffer;
+
+                    // Extract text using mammoth
+                    const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+
+                    if (result.value && result.value.trim().length > 0) {
+                        return { success: true, text: result.value.trim() };
+                    } else {
+                        return { success: false, error: 'Word document appears to be empty or contains only images.' };
+                    }
+                } catch (e) {
+                    console.error('Word document extraction error:', e);
+                    return { success: false, error: 'Failed to read Word document' };
+                }
+            }
+        }
+
+        // ============================================================
+        // CONTROLLER - Coordinates everything, defines commands
+        // ============================================================
+        class EmailReaderController {
+            constructor(model, view, gmail, speech) {
+                this.model = model;
+                this.view = view;
+                this.gmail = gmail;
+                this.speech = speech;
+
+                // Pending promise resolver for multi-step flows
+                this.pendingResolver = null;
+                this.dictationTimeout = null;
+
+                // Wire up speech recognition
+                this.speech.onCommand = (cmd) => this.handleCommand(cmd);
+
+                // Wire up model changes to view updates
+                this.model.onChange(() => this.updateView());
+
+                // Wire up dictation input events
+                this.view.elements.dictationText.addEventListener('input', () => {
+                    this.resetDictationTimeout();
+                });
+            }
+
+            // ========== COMMAND SYSTEM ==========
+            // Each command knows when it's available via isAvailable()
+            // The view automatically shows buttons for available commands
+
+            getAvailableCommands() {
+                const m = this.model;
+                const commands = [];
+
+                // Define all possible commands with their availability conditions
+                const allCommands = [
+                    // Email action commands (only when viewing an email)
+                    {
+                        id: 'markread', icon: '✓', label: 'Mark as Read',
+                        voiceMatch: (cmd) => this.matchMarkAsRead(cmd),
+                        isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
+                        execute: () => this.markAsRead()
+                    },
+                    {
+                        id: 'archive', icon: '📦', label: 'Archive',
+                        voiceMatch: (cmd) => cmd.includes('archive'),
+                        isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
+                        execute: () => this.archiveEmail()
+                    },
+                    {
+                        id: 'reply', icon: '↩️', label: 'Reply',
+                        voiceMatch: (cmd) => cmd.includes('respond') || cmd.includes('reply'),
+                        isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
+                        execute: () => this.handleReply()
+                    },
+                    {
+                        id: 'forward', icon: '➡️', label: 'Forward',
+                        voiceMatch: (cmd) => cmd.includes('forward'),
+                        isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
+                        execute: () => this.handleForward()
+                    },
+                    {
+                        id: 'next', icon: '⏭️', label: 'Next',
+                        voiceMatch: (cmd) => cmd.includes('next') || cmd.includes('skip'),
+                        isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
+                        execute: () => this.nextEmail()
+                    },
+                    {
+                        id: 'previous', icon: '⏮️', label: 'Previous',
+                        voiceMatch: (cmd) => cmd.includes('previous') || cmd.includes('back'),
+                        isAvailable: () => m.hasEmail && m.canGoPrevious && ['reading', 'idle'].includes(m.state),
+                        execute: () => this.previousEmail()
+                    },
+                    {
+                        id: 'unsubscribe', icon: '🚫', label: 'Unsubscribe',
+                        voiceMatch: (cmd) => cmd.includes('unsubscribe'),
+                        isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
+                        execute: () => this.handleUnsubscribe()
+                    },
+                    {
+                        id: 'spam', icon: '⚠️', label: 'Spam',
+                        voiceMatch: (cmd) => cmd.includes('spam'),
+                        isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
+                        execute: () => this.markAsSpam()
+                    },
+                    {
+                        id: 'attachments', icon: '📎', label: 'Read Attachments',
+                        voiceMatch: (cmd) => cmd.includes('attachment') || cmd.includes('read file') || cmd.includes('read document'),
+                        isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state) && this.hasReadableAttachments(),
+                        execute: () => this.readAttachments()
+                    },
+                    // Main control commands
+                    {
+                        id: 'start', icon: '▶️', label: 'Start Reading Emails',
+                        voiceMatch: (cmd) => cmd.includes('start') || cmd.includes('play') || cmd.includes('begin'),
+                        isAvailable: () => m.isAuthenticated && (m.state === 'idle' || m.state === 'reading') && !m.hasEmail,
+                        execute: () => this.startReading()
+                    },
+                    {
+                        id: 'stop', icon: '⏹️', label: 'Stop',
+                        voiceMatch: (cmd) => cmd.includes('stop'),
+                        isAvailable: () => m.state === 'reading' && m.hasEmail,
+                        execute: () => this.stopReading()
+                    },
+                    {
+                        id: 'signout', icon: '🚪', label: 'Sign Out',
+                        voiceMatch: (cmd) => cmd.includes('sign out') || cmd.includes('logout'),
+                        isAvailable: () => m.isAuthenticated && ['idle', 'reading'].includes(m.state),
+                        execute: () => this.signOut()
+                    },
+
+                    
+
+                    // Confirmation commands (for multi-step flows)
+                    {
+                        id: 'yes', icon: '✓', label: 'Yes',
+                        voiceMatch: (cmd) => cmd.includes('yes'),
+                        isAvailable: () => ['confirming-forward', 'confirming-forward-message'].includes(m.state),
+                        execute: () => this.resolvePending('yes')
+                    },
+                    {
+                        id: 'no', icon: '✗', label: 'No',
+                        voiceMatch: (cmd) => cmd.includes('no'),
+                        isAvailable: () => ['confirming-forward', 'confirming-forward-message'].includes(m.state),
+                        execute: () => this.resolvePending('no')
+                    },
+                    {
+                        id: 'reply-sender', icon: '👤', label: 'Reply to Sender Only',
+                        voiceMatch: (cmd) => cmd.includes('reply') && !cmd.includes('all'),
+                        isAvailable: () => m.state === 'confirming-reply-type',
+                        execute: () => this.resolvePending('reply')
+                    },
+                    {
+                        id: 'reply-all', icon: '👥', label: 'Reply All',
+                        voiceMatch: (cmd) => cmd.includes('all'),
+                        isAvailable: () => m.state === 'confirming-reply-type',
+                        execute: () => this.resolvePending('reply all')
+                    },
+                    {
+                        id: 'send', icon: '🚀', label: 'Send',
+                        voiceMatch: (cmd) => cmd.includes('send'),
+                        isAvailable: () => m.state === 'confirming-send',
+                        execute: () => this.resolvePending('send')
+                    },
+                    {
+                        id: 'edit', icon: '✏️', label: 'Edit',
+                        voiceMatch: (cmd) => cmd.includes('edit'),
+                        isAvailable: () => m.state === 'confirming-send',
+                        execute: () => this.resolvePending('edit')
+                    },
+                    {
+                        id: 'cancel', icon: '✗', label: 'Cancel',
+                        voiceMatch: (cmd) => cmd.includes('cancel'),
+                        isAvailable: () => ['confirming-send', 'confirming-forward-recipient'].includes(m.state),
+                        execute: () => this.resolvePending('cancel')
+                    }
+                ];
+
+                // Filter to only available commands and format for view
+                for (const cmd of allCommands) {
+                    if (cmd.isAvailable()) {
+                        commands.push({
+                            type: 'button',
+                            id: cmd.id,
+                            icon: cmd.icon,
+                            label: cmd.label,
+                            execute: cmd.execute
+                        });
+                    }
+                }
+
+                // Special case: forward recipient selection
+                if (m.state === 'confirming-forward-recipient' && m.recentRecipients) {
+                    commands.push({ type: 'header', text: '📬 Recent Recipients (click to select):' });
+
+                    for (const recipient of m.recentRecipients) {
+                        const match = recipient.match(/<([^>]+)>/);
+                        const email = match ? match[1] : recipient;
+                        const name = match ? recipient.replace(/<[^>]+>/, '').trim() : '';
+
+                        commands.push({
+                            type: 'button',
+                            icon: '👤',
+                            label: name || email,
+                            sublabel: name ? email : null,
+                            execute: () => this.resolvePending(recipient)
+                        });
+                    }
+
+                    commands.push({
+                        type: 'email-input',
+                        onSubmit: (email) => this.resolvePending(email)
+                    });
+
+                    commands.push({
+                        type: 'button',
+                        icon: '✗',
+                        label: 'Cancel Forward',
+                        execute: () => this.resolvePending('cancel')
+                    });
+                }
+
+                // Store commands for voice matching
+                this.currentCommands = allCommands.filter(c => c.isAvailable());
+
+                return commands;
+            }
+
+            matchMarkAsRead(cmd) {
+                return cmd.includes('marcus red') || cmd.includes('marcus read') ||
+                       cmd.includes('march is red') || cmd.includes('march is read') ||
+                       cmd.includes('march as red') || cmd.includes('march as read') ||
+                       cmd.includes('mark read') || cmd.includes('mark red') ||
+                       cmd.includes('mark as read') || cmd.includes('mark as red') ||
+                       cmd.includes('mark is red') || cmd.includes('mark is read') ||
+                       cmd === 'read' || cmd === 'red';
+            }
+
+            handleCommand(spokenCommand) {
+                this.view.updateStatus('I heard you say:', `"${spokenCommand}"`);
+
+                // Special handling for dictation mode
+                if (this.model.state === 'dictating') {
+                    this.view.appendDictationText(spokenCommand);
+                    this.resetDictationTimeout();
+                    return;
+                }
+
+                // Special handling for forward recipient voice search
+                if (this.model.state === 'confirming-forward-recipient') {
+                    if (spokenCommand.includes('cancel')) {
+                        this.resolvePending('cancel');
+                        return;
+                    }
+                    // Search for the spoken name
+                    this.searchAndSelectRecipient(spokenCommand);
+                    return;
+                }
+
+                // Find matching command from available commands
+                for (const cmd of this.currentCommands || []) {
+                    if (cmd.voiceMatch && cmd.voiceMatch(spokenCommand)) {
+                        cmd.execute();
+                        return;
+                    }
+                }
+
+                // No match
+                this.speech.speak('I did not understand that command. Please try again.');
+            }
+
+            async searchAndSelectRecipient(spokenName) {
+                this.view.updateStatus('Searching...', `Looking for ${spokenName}`);
+                const foundEmail = await this.gmail.searchForEmail(spokenName);
+
+                if (foundEmail) {
+                    this.resolvePending(foundEmail);
+                } else {
+                    this.speech.speak(`I could not find an email for ${spokenName}. Please try again, click a recent recipient, or type the email address.`);
+                    this.view.updateStatus('Choose recipient');
+                }
+            }
+
+            // ========== VIEW UPDATE ==========
+            updateView() {
+                const m = this.model;
+
+                // Show setup or main section
+                if (m.state === 'setup') {
+                    this.view.showSetup();
+                    return;
+                }
+                this.view.showMain();
+
+                // Update listening indicator
+                this.view.setListening(m.isAuthenticated);
+
+                // Show/hide email display
+                if (m.hasEmail) {
+                    const gmailUrl = `https://mail.google.com/mail/u/0/#inbox/${m.currentEmail.threadId}`;
+                    this.view.showEmail(m.currentEmail, gmailUrl, m.userEmail);
+                    // Show attachments if any
+                    const attachments = EmailUtils.getAttachments(m.currentEmail);
+                    this.view.showAttachments(attachments);
+                } else {
+                    this.view.hideEmail();
+                    this.view.hideAttachments();
+                }
+
+                // Show/hide dictation
+                if (['dictating', 'confirming-send'].includes(m.state)) {
+                    this.view.showDictation(m.dictatedText, m.state === 'dictating');
+                } else {
+                    this.view.hideDictation();
+                }
+
+                // Render available commands
+                this.view.renderCommands(this.getAvailableCommands());
+            }
+
+            // ========== PENDING PROMISE HELPERS ==========
+            resolvePending(value) {
+                if (this.pendingResolver) {
+                    const resolver = this.pendingResolver;
+                    this.pendingResolver = null;
+                    resolver(value);
+                }
+            }
+
+            waitForResponse() {
+                return new Promise(resolve => {
+                    this.pendingResolver = resolve;
+                });
+            }
+
+            // ========== DICTATION HELPERS ==========
+            resetDictationTimeout() {
+                if (this.dictationTimeout) clearTimeout(this.dictationTimeout);
+                this.dictationTimeout = setTimeout(() => {
+                    const text = this.view.getDictationText();
+                    if (text) {
+                        this.model.dictatedText = text;
+                        this.finishDictation();
+                    }
+                }, 4000);
+            }
+
+            finishDictation() {
+                if (this.dictationTimeout) clearTimeout(this.dictationTimeout);
+                this.model.dictatedText = this.view.getDictationText();
+                if (this.pendingResolver) {
+                    this.resolvePending(this.model.dictatedText);
+                }
+            }
+
+            // ========== INITIALIZATION ==========
+            init() {
+                if (this.model.clientId) {
+                    this.model.setState('idle');
+                    this.gmail.initAuth(async () => {
+                        // Pre-fetch user email so we can say "you" instead of their address
+                        await this.gmail.getMyEmail();
+                        this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
+                        setTimeout(() => {
+                            this.speech.startListening();
+                            this.view.setListening(true);
+                        }, 1000);
+                    });
+                } else {
+                    this.model.setState('setup');
+                }
+            }
+
+            saveClientId() {
+                const clientId = this.view.elements.clientIdInput.value.trim();
+                if (!clientId) {
+                    alert('Please enter your Gmail API Client ID');
+                    return;
+                }
+                this.model.clientId = clientId;
+                localStorage.setItem('gmailClientId', clientId);
+                this.model.setState('idle');
+                this.gmail.initAuth(async () => {
+                    // Pre-fetch user email so we can say "you" instead of their address
+                    await this.gmail.getMyEmail();
+                    this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
+                    setTimeout(() => {
+                        this.speech.startListening();
+                        this.view.setListening(true);
+                    }, 1000);
+                });
+            }
+
+            signOut() {
+                this.gmail.signOut();
+                this.model.emails = [];
+                this.model.currentEmailIndex = 0;
+                this.model.setState('setup');
+                this.view.updateStatus('Signed out', 'Please refresh and sign in again');
+            }
+
+            // ========== EMAIL READING ==========
+            async startReading() {
+                if (!this.model.isAuthenticated) return;
+
+                this.model.setCurrentEmailIndex(0);
+                this.model.seenEmailIds = new Set();
+                this.model.setState('loading');
+                this.view.updateStatus('Fetching unread emails...');
+
+                const emails = await this.gmail.fetchUnreadEmails();
+                this.model.setEmails(emails);
+
+                if (emails.length === 0) {
+                    this.view.updateStatus('No unread emails', 'Your inbox is empty!');
+                    this.model.setState('idle');
+                    this.speech.speak('You have no unread emails. Great job!');
+                } else {
+                    this.view.updateStatus(`Found ${emails.length} unread emails`, 'Starting to read...');
+                    this.model.setState('reading');
+                    this.readCurrentEmail();
+                }
+            }
+
+            stopReading() {
+                this.speech.cancel();
+                if (this.model.hasEmail) {
+                    this.model.setState('idle');
+                    this.view.updateStatus('Stopped reading', 'You can still take actions on this email');
+                } else {
+                    this.model.setState('idle');
+                    this.view.updateStatus('Stopped');
+                }
+            }
+
+            async readCurrentEmail() {
+                const email = this.model.currentEmail;
+                if (!email) {
+                    await this.checkForMoreEmails();
+                    return;
+                }
+
+                this.model.setState('reading');
+                this.view.updateStatus('Reading email aloud...');
+
+                const fromRaw = EmailUtils.getHeader(email, 'From') || 'Unknown sender';
+                const subject = EmailUtils.getHeader(email, 'Subject') || 'No subject';
+                const toRaw = EmailUtils.getHeader(email, 'To') || '';
+                const ccRaw = EmailUtils.getHeader(email, 'Cc') || '';
+                const body = EmailUtils.getEmailBody(email);
+
+                // Replace user's email with "you" for natural speech
+                const userEmail = this.model.userEmail;
+                const from = EmailUtils.replaceUserEmail(fromRaw, userEmail);
+                const to = EmailUtils.replaceUserEmail(toRaw, userEmail);
+                const cc = EmailUtils.replaceUserEmail(ccRaw, userEmail);
+
+                // Get attachments
+                const attachments = EmailUtils.getAttachments(email);
+                const readableAttachments = attachments.filter(a => EmailUtils.isReadableAttachment(a));
+
+                // Build speech text
+                let headerText = `From ${from}.`;
+                if (to) {
+                    const toAddrs = to.split(',').map(a => a.trim());
+                    headerText += toAddrs.length <= 3
+                        ? ` To: ${toAddrs.join(', ')}.`
+                        : ` To: ${toAddrs.slice(0, 3).join(', ')}, and ${toAddrs.length - 3} others.`;
+                }
+                if (cc) {
+                    const ccAddrs = cc.split(',').map(a => a.trim());
+                    headerText += ccAddrs.length <= 3
+                        ? ` CC: ${ccAddrs.join(', ')}.`
+                        : ` CC: ${ccAddrs.slice(0, 3).join(', ')}, and ${ccAddrs.length - 3} others.`;
+                }
+                headerText += ` Subject: ${subject}.`;
+
+                // Add attachment announcement
+                if (attachments.length > 0) {
+                    const attachmentNames = attachments.map(a => a.filename).join(', ');
+                    if (attachments.length === 1) {
+                        headerText += ` This email has 1 attachment: ${attachmentNames}.`;
+                    } else {
+                        headerText += ` This email has ${attachments.length} attachments: ${attachmentNames}.`;
+                    }
+                    if (readableAttachments.length > 0) {
+                        headerText += ` Say "read attachments" to hear ${readableAttachments.length === 1 ? 'it' : 'them'}.`;
+                    }
+                }
+
+                const fullText = headerText + ' ' + body;
+                const headerWords = headerText.split(/\s+/).length;
+                const bodyWords = body.split(/\s+/).length;
+
+                await this.speech.speakWithScroll(fullText, this.view, headerWords, bodyWords, 40);
+            }
+
+            async checkForMoreEmails() {
+                this.model.setState('loading');
+                this.view.updateStatus('Checking for more emails...');
+
+                const seenIds = new Set(this.model.emails.map(e => e.id));
+                const newEmails = await this.gmail.fetchUnreadEmails();
+                const unseenEmails = newEmails.filter(e => !seenIds.has(e.id));
+
+                if (unseenEmails.length > 0) {
+                    this.model.setEmails(unseenEmails);
+                    this.model.setCurrentEmailIndex(0);
+                    this.model.setState('reading');
+                    await this.speech.speak(`Found ${unseenEmails.length} more unread emails. Continuing.`);
+                    this.readCurrentEmail();
+                } else {
+                    await this.speech.speak('You have reached the end of your unread emails. Great job!');
+                    this.model.setState('idle');
+                }
+            }
+
+            async nextEmail() {
+                await this.speech.speak('Moving to next email.');
+                this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
+                this.readCurrentEmail();
+            }
+
+            async previousEmail() {
+                if (this.model.canGoPrevious) {
+                    await this.speech.speak('Going back to previous email.');
+                    this.model.setCurrentEmailIndex(this.model.currentEmailIndex - 1);
+                    this.readCurrentEmail();
+                } else {
+                    await this.speech.speak('This is the first email. Cannot go back.');
+                }
+            }
+
+            // ========== EMAIL ACTIONS ==========
+            async markAsRead() {
+                this.view.updateStatus('Marking as read...');
+                try {
+                    await this.gmail.modifyEmail(this.model.currentEmail.id, [], ['UNREAD']);
+                    await this.speech.speak('Email marked as read.');
+                    this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
+                    this.readCurrentEmail();
+                } catch (e) {
+                    await this.speech.speak('Sorry, I could not mark that email as read.');
+                }
+            }
+
+            async archiveEmail() {
+                this.view.updateStatus('Archiving email...');
+                try {
+                    await this.gmail.modifyEmail(this.model.currentEmail.id, [], ['INBOX', 'UNREAD']);
+                    await this.speech.speak('Email archived.');
+                    this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
+                    this.readCurrentEmail();
+                } catch (e) {
+                    await this.speech.speak('Sorry, I could not archive that email.');
+                }
+            }
+
+            async markAsSpam() {
+                this.view.updateStatus('Marking as spam...');
+                try {
+                    await this.gmail.modifyEmail(this.model.currentEmail.id, ['SPAM'], ['INBOX', 'UNREAD']);
+                    await this.speech.speak('Email marked as spam.');
+                    this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
+                    this.readCurrentEmail();
+                } catch (e) {
+                    await this.speech.speak('Sorry, I could not mark that email as spam.');
+                }
+            }
+
+            // ========== REPLY FLOW ==========
+            async handleReply() {
+                const email = this.model.currentEmail;
+                const from = EmailUtils.getHeader(email, 'From');
+                const to = EmailUtils.getHeader(email, 'To');
+                const cc = EmailUtils.getHeader(email, 'Cc');
+                const senderName = from.replace(/<[^>]+>/, '').trim() || from;
+
+                // Check if reply-all is an option
+                const hasOthers = cc || (to && to.includes(','));
+                let isReplyAll = false;
+
+                if (hasOthers) {
+                    this.model.setState('confirming-reply-type');
+                    this.view.updateStatus('Choose reply type');
+                    this.speech.speak('This email has other recipients. Say Reply to Sender Only, or Reply All to respond to everyone.');
+
+                    const response = await this.waitForResponse();
+                    isReplyAll = response.includes('all');
+                }
+
+                this.model.isReplyAll = isReplyAll;
+
+                // Start dictation
+                this.model.dictatedText = '';
+                this.model.setState('dictating');
+                this.view.updateStatus('Listening for response', `Start speaking your reply`);
+                this.view.showDictation('', true);
+
+                if (isReplyAll) {
+                    this.speech.speak('What would you like to say in your response to the group?');
+                } else {
+                    this.speech.speak(`What would you like to say in your response to ${senderName}?`);
+                }
+
+                // Wait for dictation to complete
+                const responseText = await this.waitForResponse();
+
+                // Confirm
+                this.model.dictatedText = responseText;
+                this.model.setState('confirming-send');
+                this.view.updateStatus('Confirm response');
+                this.speech.speak(`You said: ${responseText}. Say Send to send, Edit to try again, or Cancel to go back.`);
+
+                const confirmation = await this.waitForResponse();
+
+                if (confirmation === 'send') {
+                    this.view.hideDictation();
+                    await this.sendReply(responseText, isReplyAll);
+                } else if (confirmation === 'edit') {
+                    this.view.hideDictation();
+                    await this.handleReply(); // Retry
+                } else {
+                    this.view.hideDictation();
+                    this.model.setState('idle');
+                    this.view.updateStatus('Waiting for command');
+                    this.speech.speak('Response cancelled. What would you like to do with this email?');
+                }
+            }
+
+            async sendReply(text, isReplyAll) {
+                this.view.updateStatus('Sending reply...');
+
+                try {
+                    const email = this.model.currentEmail;
+                    const from = EmailUtils.getHeader(email, 'From');
+                    const origTo = EmailUtils.getHeader(email, 'To');
+                    const origCc = EmailUtils.getHeader(email, 'Cc');
+                    const subject = EmailUtils.getHeader(email, 'Subject');
+                    const messageId = EmailUtils.getHeader(email, 'Message-ID');
+                    const references = EmailUtils.getHeader(email, 'References') || messageId;
+
+                    let toRecipients = from;
+                    let ccRecipients = '';
+
+                    if (isReplyAll) {
+                        const myEmail = await this.gmail.getMyEmail();
+
+                        if (origTo) {
+                            const others = origTo.split(',')
+                                .map(a => a.trim())
+                                .filter(a => !a.toLowerCase().includes(myEmail.toLowerCase()))
+                                .filter(a => !a.toLowerCase().includes(from.toLowerCase().replace(/<[^>]+>/, '').trim()));
+                            if (others.length) toRecipients += ', ' + others.join(', ');
+                        }
+
+                        if (origCc) {
+                            const ccList = origCc.split(',')
+                                .map(a => a.trim())
+                                .filter(a => !a.toLowerCase().includes(myEmail.toLowerCase()));
+                            if (ccList.length) ccRecipients = ccList.join(', ');
+                        }
+                    }
+
+                    const emailLines = [`To: ${toRecipients}`];
+                    if (ccRecipients) emailLines.push(`Cc: ${ccRecipients}`);
+                    emailLines.push(
+                        `Subject: Re: ${subject}`,
+                        `In-Reply-To: ${messageId}`,
+                        `References: ${references}`,
+                        '',
+                        text
+                    );
+
+                    await this.gmail.sendEmail(emailLines.join('\n'), email.threadId);
+
+                    this.model.setState('idle');
+                    this.view.updateStatus('Waiting for command');
+                    this.speech.speak('Reply sent. What would you like to do with this email now?');
+                } catch (e) {
+                    console.error('Send reply error:', e);
+                    this.speech.speak('Sorry, I could not send that reply.');
+                    this.model.setState('idle');
+                }
+            }
+
+            // ========== FORWARD FLOW ==========
+            async handleForward() {
+                this.view.updateStatus('Loading recent recipients...');
+                const recipients = await this.gmail.getRecentRecipients(6);
+                this.model.recentRecipients = recipients;
+
+                this.model.setState('confirming-forward-recipient');
+                this.view.updateStatus('Choose recipient');
+                this.speech.speak('Who would you like to forward this email to?');
+
+                const selectedRecipient = await this.waitForResponse();
+
+                if (selectedRecipient === 'cancel') {
+                    this.model.setState('idle');
+                    this.view.updateStatus('Waiting for command');
+                    this.speech.speak('Forward cancelled. What would you like to do with this email?');
+                    return;
+                }
+
+                // Extract email address
+                const match = selectedRecipient.match(/<([^>]+)>/);
+                const emailAddress = match ? match[1] : selectedRecipient;
+
+                // Confirm recipient
+                this.model.setState('confirming-forward');
+                this.view.updateStatus('Confirm recipient', `Forward to ${emailAddress}?`);
+                this.speech.speak(`Forward to ${emailAddress}. Say Yes to confirm, or No to cancel.`);
+
+                const confirmation = await this.waitForResponse();
+
+                if (confirmation.includes('yes')) {
+                    await this.forwardEmail(emailAddress);
+                } else {
+                    this.model.setState('idle');
+                    this.view.updateStatus('Waiting for command');
+                    this.speech.speak('Forward cancelled. What would you like to do with this email?');
+                }
+            }
+
+            async forwardEmail(toAddress) {
+                // Ask about adding a message
+                this.model.setState('confirming-forward-message');
+                this.view.updateStatus('Add message?');
+                this.speech.speak('Would you like to add a message to this forward? Say Yes or No.');
+
+                const wantsMessage = await this.waitForResponse();
+                let forwardMessage = '';
+
+                if (wantsMessage.includes('yes')) {
+                    // Get message via dictation
+                    this.model.dictatedText = '';
+                    this.model.setState('dictating');
+                    this.view.updateStatus('Listening for message');
+                    this.view.showDictation('', true);
+                    this.speech.speak('What would you like to say in your message?');
+
+                    forwardMessage = await this.waitForResponse();
+
+                    // Confirm
+                    this.model.dictatedText = forwardMessage;
+                    this.model.setState('confirming-send');
+                    this.view.updateStatus('Confirm forward');
+                    this.speech.speak(`You said: ${forwardMessage}. Say Send to forward with this message, Edit to try again, or Cancel to go back.`);
+
+                    const confirmation = await this.waitForResponse();
+                    this.view.hideDictation();
+
+                    if (confirmation === 'edit') {
+                        return await this.forwardEmail(toAddress);
+                    } else if (confirmation !== 'send') {
+                        this.model.setState('idle');
+                        this.view.updateStatus('Waiting for command');
+                        this.speech.speak('Forward cancelled. What would you like to do with this email?');
+                        return;
+                    }
+                }
+
+                // Send the forward
+                this.view.updateStatus('Forwarding email...');
+
+                try {
+                    const email = this.model.currentEmail;
+                    const subject = EmailUtils.getHeader(email, 'Subject');
+                    const body = EmailUtils.getEmailBody(email);
+
+                    const emailParts = [
+                        `To: ${toAddress}`,
+                        `Subject: Fwd: ${subject}`,
+                        ''
+                    ];
+
+                    if (forwardMessage) {
+                        emailParts.push(forwardMessage);
+                        emailParts.push('');
+                    }
+
+                    emailParts.push('---------- Forwarded message ---------');
+                    emailParts.push(body);
+
+                    await this.gmail.sendEmail(emailParts.join('\n'));
+
+                    this.model.setState('idle');
+                    this.view.updateStatus('Waiting for command');
+                    this.speech.speak('Email forwarded. What would you like to do with this email now?');
+                } catch (e) {
+                    console.error('Forward error:', e);
+                    this.speech.speak('Sorry, I could not forward that email.');
+                    this.model.setState('idle');
+                }
+            }
+
+            // ========== UNSUBSCRIBE ==========
+            async handleUnsubscribe() {
+                const fullBody = EmailUtils.extractFullBody(this.model.currentEmail.payload);
+                const match = fullBody.match(/https?:\/\/[^\s<>"]+unsubscribe[^\s<>"]*/i);
+
+                if (match) {
+                    await this.speech.speak('I found an unsubscribe link. I will click it. You may need to take some action in your browser.');
+                    this.view.updateStatus('Opening unsubscribe link...');
+                    window.open(match[0], '_blank');
+                } else {
+                    await this.speech.speak('I could not find an unsubscribe link in this email. Marking as read so you can find it later.');
+                }
+
+                await this.gmail.modifyEmail(this.model.currentEmail.id, [], ['UNREAD']);
+                await this.speech.speak('Marked as read. Moving to next email.');
+                this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
+                this.readCurrentEmail();
+            }
+
+            // ========== ATTACHMENTS ==========
+            hasReadableAttachments() {
+                if (!this.model.currentEmail) return false;
+                const attachments = EmailUtils.getAttachments(this.model.currentEmail);
+                return attachments.some(att => EmailUtils.isReadableAttachment(att));
+            }
+
+            getReadableAttachments() {
+                if (!this.model.currentEmail) return [];
+                const attachments = EmailUtils.getAttachments(this.model.currentEmail);
+                return attachments.filter(att => EmailUtils.isReadableAttachment(att));
+            }
+
+            async readAttachments() {
+                const readableAttachments = this.getReadableAttachments();
+
+                if (readableAttachments.length === 0) {
+                    await this.speech.speak('This email has no readable attachments.');
+                    return;
+                }
+
+                this.view.updateStatus('Reading attachments...');
+
+                for (let i = 0; i < readableAttachments.length; i++) {
+                    const attachment = readableAttachments[i];
+                    const position = readableAttachments.length > 1 ? `Attachment ${i + 1} of ${readableAttachments.length}. ` : '';
+
+                    await this.speech.speak(`${position}Reading ${attachment.filename}. Please wait while I extract the text.`);
+                    this.view.updateStatus(`Reading ${attachment.filename}...`);
+
+                    const result = await this.gmail.extractAttachmentText(
+                        this.model.currentEmail.id,
+                        attachment
+                    );
+
+                    if (result.success) {
+                        // Limit text length for very long documents
+                        let textToRead = result.text;
+                        const maxChars = 10000;
+                        let truncated = false;
+
+                        if (textToRead.length > maxChars) {
+                            textToRead = textToRead.substring(0, maxChars);
+                            truncated = true;
+                        }
+
+                        await this.speech.speak(`Content of ${attachment.filename}: ${textToRead}`);
+
+                        if (truncated) {
+                            await this.speech.speak('Note: This document was very long, so I only read the first portion.');
+                        }
+                    } else {
+                        await this.speech.speak(`Sorry, I could not read ${attachment.filename}. ${result.error}`);
+                    }
+                }
+
+                this.view.updateStatus('Finished reading attachments');
+                await this.speech.speak('Finished reading attachments. What would you like to do with this email?');
+                this.model.setState('idle');
+            }
+        }
+
+        // ============================================================
+        // APP INITIALIZATION
+        // ============================================================
+        const model = new EmailReaderModel();
+        const view = new EmailReaderView();
+        const gmail = new GmailService(model);
+        const speech = new SpeechService();
+        const app = new EmailReaderController(model, view, gmail, speech);
+
+        window.onload = () => app.init();
+    </script>
+</body>
+</html>
