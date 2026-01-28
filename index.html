@@ -1984,7 +1984,7 @@
                 this.view.updateStatus('Marking as read...');
                 try {
                     await this.gmail.modifyEmail(this.model.currentEmail.id, [], ['UNREAD']);
-                    await this.speech.speak('Email marked as read.');
+                    await this.speech.speak('Email marked as red.');
                     this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
                     this.readCurrentEmail();
                 } catch (e) {
@@ -2257,7 +2257,7 @@
                 }
 
                 await this.gmail.modifyEmail(this.model.currentEmail.id, [], ['UNREAD']);
-                await this.speech.speak('Marked as read. Moving to next email.');
+                await this.speech.speak('Marked as red. Moving to next email.');
                 this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
                 this.readCurrentEmail();
             }
