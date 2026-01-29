@@ -1129,67 +1129,8 @@
                 this.onCommand = null; // Callback when voice command is heard
                 this.scrollInterval = null;
                 this.scrollTimeout = null;
-                this.isCancelled = false; // Track if speech was cancelled
-                this.speakingChunks = false; // Track if currently speaking chunks
 
                 this.initRecognition();
-            }
-
-            // Split text into chunks that iOS can handle reliably
-            // iOS has a bug where long utterances get cut off or fail silently
-            // Max ~200 chars per chunk, breaking at sentence/clause boundaries
-            static chunkText(text, maxChunkLength = 180) {
-                const chunks = [];
-                let remaining = text.trim();
-
-                while (remaining.length > 0) {
-                    if (remaining.length <= maxChunkLength) {
-                        chunks.push(remaining);
-                        break;
-                    }
-
-                    // Find the best break point within maxChunkLength
-                    let breakPoint = -1;
-                    const searchArea = remaining.substring(0, maxChunkLength);
-
-                    // Priority 1: Break at sentence endings (. ! ?)
-                    const sentenceEnders = ['. ', '! ', '? ', '.\n', '!\n', '?\n'];
-                    for (const ender of sentenceEnders) {
-                        const idx = searchArea.lastIndexOf(ender);
-                        if (idx > breakPoint) {
-                            breakPoint = idx + ender.length - 1; // Include the punctuation
-                        }
-                    }
-
-                    // Priority 2: Break at clause boundaries (, ; :)
-                    if (breakPoint === -1 || breakPoint < maxChunkLength * 0.3) {
-                        const clauseEnders = [', ', '; ', ': '];
-                        for (const ender of clauseEnders) {
-                            const idx = searchArea.lastIndexOf(ender);
-                            if (idx > breakPoint) {
-                                breakPoint = idx + ender.length - 1;
-                            }
-                        }
-                    }
-
-                    // Priority 3: Break at word boundary (space)
-                    if (breakPoint === -1 || breakPoint < maxChunkLength * 0.3) {
-                        const spaceIdx = searchArea.lastIndexOf(' ');
-                        if (spaceIdx > 0) {
-                            breakPoint = spaceIdx;
-                        }
-                    }
-
-                    // Fallback: Hard break at maxChunkLength
-                    if (breakPoint === -1 || breakPoint < 10) {
-                        breakPoint = maxChunkLength;
-                    }
-
-                    chunks.push(remaining.substring(0, breakPoint + 1).trim());
-                    remaining = remaining.substring(breakPoint + 1).trim();
-                }
-
-                return chunks.filter(chunk => chunk.length > 0);
             }
 
             initRecognition() {
@@ -1231,121 +1172,78 @@
                 return false;
             }
 
-            // Speak a single chunk (internal method)
-            speakSingleChunk(text) {
+            speak(text, onStart = null, onEnd = null) {
                 return new Promise((resolve) => {
-                    this.currentUtterance = new SpeechSynthesisUtterance(text);
-                    this.currentUtterance.rate = 1.0;
-                    this.currentUtterance.pitch = 1.0;
-                    this.currentUtterance.volume = 1.0;
+                    if (this.synthesis.paused) this.synthesis.resume();
+                    this.synthesis.cancel();
 
-                    this.currentUtterance.onend = () => resolve(true);
-                    this.currentUtterance.onerror = (e) => {
-                        console.warn('Speech chunk error:', e);
-                        resolve(false);
-                    };
+                    setTimeout(() => {
+                        this.currentUtterance = new SpeechSynthesisUtterance(text);
+                        this.currentUtterance.rate = 1.0;
+                        this.currentUtterance.pitch = 1.0;
+                        this.currentUtterance.volume = 1.0;
 
-                    this.synthesis.speak(this.currentUtterance);
+                        this.currentUtterance.onstart = () => {
+                            if (onStart) onStart();
+                        };
 
-                    // Chrome bug workaround - keep synthesis alive
-                    const keepAlive = setInterval(() => {
-                        if (!this.synthesis.speaking) {
-                            clearInterval(keepAlive);
-                        } else if (this.synthesis.paused) {
-                            this.synthesis.resume();
-                        }
+                        this.currentUtterance.onend = () => {
+                            if (onEnd) onEnd();
+                            resolve();
+                        };
+
+                        this.currentUtterance.onerror = () => resolve();
+
+                        this.synthesis.speak(this.currentUtterance);
+
+                        // Chrome bug workaround
+                        setTimeout(() => {
+                            if (this.synthesis.paused) this.synthesis.resume();
+                        }, 100);
                     }, 100);
                 });
             }
 
-            // Speak text using chunks (mobile-friendly)
-            async speak(text, onStart = null, onEnd = null) {
-                this.isCancelled = false;
-                this.speakingChunks = true;
+            // Speak with auto-scroll timing
+            speakWithScroll(text, view, headerWordCount, bodyWordCount, scrollDelayWords) {
+                return new Promise((resolve) => {
+                    if (this.synthesis.paused) this.synthesis.resume();
+                    this.synthesis.cancel();
 
-                if (this.synthesis.paused) this.synthesis.resume();
-                this.synthesis.cancel();
+                    setTimeout(() => {
+                        this.currentUtterance = new SpeechSynthesisUtterance(text);
+                        this.currentUtterance.rate = 1.0;
 
-                // Small delay after cancel to ensure clean state
-                await new Promise(r => setTimeout(r, 100));
+                        this.currentUtterance.onstart = () => {
+                            if (bodyWordCount > 0) {
+                                const wordsPerSecond = 2.5;
+                                const headerDurationMs = (headerWordCount / wordsPerSecond) * 1000;
+                                const scrollDelayDurationMs = (scrollDelayWords / wordsPerSecond) * 1000;
+                                const totalDelayMs = headerDurationMs + scrollDelayDurationMs;
+                                const remainingBodyDurationMs = ((bodyWordCount - scrollDelayWords) / wordsPerSecond) * 1000;
 
-                const chunks = SpeechService.chunkText(text);
-
-                if (onStart) onStart();
-
-                for (let i = 0; i < chunks.length; i++) {
-                    if (this.isCancelled) break;
-
-                    await this.speakSingleChunk(chunks[i]);
-
-                    // Small pause between chunks for natural flow
-                    if (i < chunks.length - 1 && !this.isCancelled) {
-                        await new Promise(r => setTimeout(r, 50));
-                    }
-                }
-
-                this.speakingChunks = false;
-                if (onEnd) onEnd();
-            }
-
-            // Speak with auto-scroll timing (using chunks for mobile compatibility)
-            async speakWithScroll(text, view, headerWordCount, bodyWordCount, scrollDelayWords) {
-                this.isCancelled = false;
-                this.speakingChunks = true;
-
-                if (this.synthesis.paused) this.synthesis.resume();
-                this.synthesis.cancel();
-
-                // Small delay after cancel to ensure clean state
-                await new Promise(r => setTimeout(r, 100));
-
-                const chunks = SpeechService.chunkText(text);
-                const wordsPerSecond = 2.5;
-
-                // Calculate timing for scroll start
-                const scrollStartWordIndex = headerWordCount + scrollDelayWords;
-                const remainingBodyDurationMs = ((bodyWordCount - scrollDelayWords) / wordsPerSecond) * 1000;
-
-                // Track cumulative words spoken to know when to start scrolling
-                let wordsSoFar = 0;
-                let scrollStarted = false;
-
-                for (let i = 0; i < chunks.length; i++) {
-                    if (this.isCancelled) break;
-
-                    const chunk = chunks[i];
-                    const chunkWordCount = chunk.split(/\s+/).length;
-
-                    // Check if we should start scrolling during this chunk
-                    if (!scrollStarted && bodyWordCount > 0) {
-                        const wordsAtEndOfChunk = wordsSoFar + chunkWordCount;
-
-                        if (wordsAtEndOfChunk >= scrollStartWordIndex) {
-                            // Calculate delay within this chunk to start scroll
-                            const wordsIntoChunk = Math.max(0, scrollStartWordIndex - wordsSoFar);
-                            const delayMs = (wordsIntoChunk / wordsPerSecond) * 1000;
-
-                            this.scrollTimeout = setTimeout(() => {
-                                if (!this.isCancelled) {
+                                this.scrollTimeout = setTimeout(() => {
                                     this.scrollInterval = view.startAutoScroll(remainingBodyDurationMs);
-                                }
-                            }, delayMs);
+                                }, totalDelayMs);
+                            }
+                        };
 
-                            scrollStarted = true;
-                        }
-                    }
+                        this.currentUtterance.onend = () => {
+                            this.clearScrollTimers();
+                            resolve();
+                        };
 
-                    await this.speakSingleChunk(chunk);
-                    wordsSoFar += chunkWordCount;
+                        this.currentUtterance.onerror = () => {
+                            this.clearScrollTimers();
+                            resolve();
+                        };
 
-                    // Small pause between chunks for natural flow
-                    if (i < chunks.length - 1 && !this.isCancelled) {
-                        await new Promise(r => setTimeout(r, 50));
-                    }
-                }
-
-                this.clearScrollTimers();
-                this.speakingChunks = false;
+                        this.synthesis.speak(this.currentUtterance);
+                        setTimeout(() => {
+                            if (this.synthesis.paused) this.synthesis.resume();
+                        }, 100);
+                    }, 100);
+                });
             }
 
             clearScrollTimers() {
@@ -1356,14 +1254,12 @@
             }
 
             cancel() {
-                this.isCancelled = true;
-                this.speakingChunks = false;
                 this.clearScrollTimers();
                 if (this.synthesis) this.synthesis.cancel();
             }
 
             get isSpeaking() {
-                return this.synthesis.speaking || this.speakingChunks;
+                return this.synthesis.speaking;
             }
         }
 
