@@ -430,7 +430,7 @@
         <div class="welcome-content">
             <img src="logo.png" alt="Voice Email Reader" class="welcome-logo">
             <div class="welcome-text">
-                <div class="welcome-cta">Tap anywhere to enter.</div>
+                <div class="welcome-cta">Tap anywhere to hear your emails.</div>
             </div>
         </div>
     </div>
@@ -1934,19 +1934,16 @@
             }
 
             // Handle tap on welcome screen - this user gesture enables iOS audio
+            // and immediately starts reading emails (no separate idle screen)
             onWelcomeScreenTap() {
                 if (this.model.state !== 'welcome') return;
 
                 // This tap/click counts as a user gesture for iOS
-                // Initialize audio by speaking a brief welcome message
-                this.model.setState('idle');
-                this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
+                // Start speech services immediately - the user gesture enables audio on iOS
+                this.speech.startListening();
 
-                // Start speech services - the user gesture enables audio on iOS
-                this.speech.speak('Welcome to Voice Email Reader. Say "start" or click a button to begin.').then(() => {
-                    this.speech.startListening();
-                    this.view.setListening(true);
-                });
+                // Directly start reading emails - no intermediate "idle" state needed
+                this.startReading();
             }
 
             saveClientId() {
