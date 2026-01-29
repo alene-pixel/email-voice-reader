@@ -340,22 +340,24 @@
                 </ol>
             </div>
 
-            <div style="margin-bottom: 20px;">
-                <label for="clientId" style="display: block; margin-bottom: 8px; color: #333; font-weight: 600;">
-                    Gmail API Client ID:
-                </label>
-                <input
-                    type="text"
-                    id="clientId"
-                    placeholder="123456789-abc123.apps.googleusercontent.com"
-                    style="width: 100%; padding: 12px; border: 2px solid #FFD6E0; border-radius: 8px; font-size: 14px;"
-                />
-            </div>
+            <div style="background: #F5F0FF; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                <div style="margin-bottom: 20px;">
+                    <label for="clientId" style="display: block; margin-bottom: 8px; color: #333; font-weight: 600;">
+                        Gmail API Client ID:
+                    </label>
+                    <input
+                        type="text"
+                        id="clientId"
+                        placeholder="123456789-abc123.apps.googleusercontent.com"
+                        style="width: 100%; padding: 12px; border: 2px solid #FFD6E0; border-radius: 8px; font-size: 14px;"
+                    />
+                </div>
 
-            <button class="command-button" style="width: 100%; justify-content: center;" onclick="app.saveClientId()">
-                <span class="command-icon">🔗</span>
-                <span class="command-text"><strong>Save & Connect to Gmail</strong></span>
-            </button>
+                <button class="command-button" style="width: 100%; justify-content: center;" onclick="app.saveClientId()">
+                    <span class="command-icon">🔗</span>
+                    <span class="command-text"><strong>Save & Connect to Gmail</strong></span>
+                </button>
+            </div>
         </div>
 
         <div id="mainSection" class="hidden">
