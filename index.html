@@ -479,7 +479,7 @@
         <div id="mainSection" class="hidden">
             <div class="status">
                 <div class="status-text" id="statusText">Ready to start</div>
-                <div class="status-detail" id="statusDetail">Click or say "Start Reading Emails" to begin</div>
+                <div class="status-detail" id="statusDetail">Click or say "Play Emails" to begin</div>
             </div>
 
             <div id="dictationDisplay" class="dictation-display hidden">
@@ -1669,7 +1669,7 @@
                     },
                     // Main control commands
                     {
-                        id: 'start', icon: '▶️', label: 'Start Reading Emails',
+                        id: 'start', icon: '▶️', label: 'Play Emails',
                         voiceMatch: (cmd) => cmd.includes('start') || cmd.includes('play') || cmd.includes('begin'),
                         isAvailable: () => m.isAuthenticated && (m.state === 'idle' || m.state === 'reading') && !m.hasEmail,
                         execute: () => this.startReading()
