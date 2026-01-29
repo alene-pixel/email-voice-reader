@@ -1935,16 +1935,20 @@
             }
 
             // Handle tap on welcome screen - this user gesture enables iOS audio
-onWelcomeScreenTap() {
-    this.model.setState('loading');
-    
-    // ✅ WORKS - synchronous speak() unlocks iOS audio
-    this.speech.speak('Welcome! Getting your emails now.').then(async () => {
-        // Audio is now unlocked, async operations are safe
-        const emails = await this.gmail.fetchUnreadEmails();
-        // ... read emails
-    });
-}
+            onWelcomeScreenTap() {
+                if (this.model.state !== 'welcome') return;
+
+                // This tap/click counts as a user gesture for iOS
+                // Initialize audio by speaking a brief welcome message
+                this.model.setState('idle');
+                this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
+
+                // Start speech services - the user gesture enables audio on iOS
+                this.speech.speak('Welcome to Voice Email Reader. Say "start" or click a button to begin.').then(() => {
+                    this.speech.startListening();
+                    this.view.setListening(true);
+                });
+            }
 
             saveClientId() {
                 const clientId = this.view.elements.clientIdInput.value.trim();
