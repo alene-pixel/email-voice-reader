@@ -431,7 +431,7 @@
         <div class="welcome-content">
             <img src="logo.png" alt="Voice Email Reader" class="welcome-logo">
             <div class="welcome-text">
-                <div class="welcome-cta">Tap anywhere to hear your emails.</div>
+                <div class="welcome-cta">Tap anywhere to enter.</div>
             </div>
         </div>
     </div>
@@ -1935,41 +1935,18 @@
             }
 
             // Handle tap on welcome screen - this user gesture enables iOS audio
-            // CRITICAL: The first speech.speak() call MUST be synchronous within this handler
-            // to unlock iOS audio. All async work happens AFTER the welcome message.
             onWelcomeScreenTap() {
                 if (this.model.state !== 'welcome') return;
 
-                // Update UI immediately
-                this.model.setState('loading');
-                this.view.updateStatus('Fetching your emails...', 'One moment please');
+                // This tap/click counts as a user gesture for iOS
+                // Initialize audio by speaking a brief welcome message
+                this.model.setState('idle');
+                this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
 
-                // CRITICAL: This synchronous speech.speak() call unlocks iOS audio.
-                // Do NOT add any await/async before this line!
-                this.speech.speak('Welcome to Voice Email Reader! Let me check your inbox.').then(async () => {
-                    // Audio is now unlocked - safe to do async operations
+                // Start speech services - the user gesture enables audio on iOS
+                this.speech.speak('Welcome to Voice Email Reader. Say "start" or click a button to begin.').then(() => {
                     this.speech.startListening();
-
-                    try {
-                        // Fetch emails
-                        const emails = await this.gmail.fetchUnreadEmails();
-                        this.model.setEmails(emails);
-
-                        if (emails.length === 0) {
-                            this.view.updateStatus('No unread emails', 'Your inbox is empty!');
-                            this.model.setState('idle');
-                            this.speech.speak('You have no unread emails. Great job!');
-                        } else {
-                            this.view.updateStatus(`Found ${emails.length} unread emails`, 'Starting to read...');
-                            this.model.setState('reading');
-                            this.readCurrentEmail();
-                        }
-                    } catch (error) {
-                        console.error('Error fetching emails:', error);
-                        this.view.updateStatus('Error', 'Could not fetch emails. Please try again.');
-                        this.model.setState('idle');
-                        this.speech.speak('Sorry, I had trouble fetching your emails. Please try again.');
-                    }
+                    this.view.setListening(true);
                 });
             }
 
