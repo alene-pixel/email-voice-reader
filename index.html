@@ -1922,7 +1922,6 @@
                 });
 
                 if (this.model.clientId) {
-                    this.model.setState('idle');
                     this.gmail.initAuth(async () => {
                         // Pre-fetch user email so we can say "you" instead of their address
                         await this.gmail.getMyEmail();
