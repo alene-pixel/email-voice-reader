@@ -441,45 +441,10 @@
             <img src="logo.png" alt="Voice Email Reader" class="logo-image">
         </div>
 
-        <div id="setupSection">
-            <div class="setup-instructions">
-                <h3>Setup Required</h3>
-                <p style="margin-bottom: 15px;">To use this app, you need to set up Gmail API credentials:</p>
-                <ol>
-                    <li>Go to <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
-                    <li>Create a new project or select an existing one</li>
-                    <li>Enable the Gmail API for your project</li>
-                    <li>Create OAuth 2.0 credentials (Web application)</li>
-                    <li>Add <code>http://localhost</code> and your domain to authorized JavaScript origins</li>
-                    <li>Add <code>http://localhost</code> and your domain to authorized redirect URIs</li>
-                    <li>Copy your Client ID and paste it below</li>
-                </ol>
-            </div>
-
-            <div style="background: #F5F0FF; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-                <div style="margin-bottom: 20px;">
-                    <label for="clientId" style="display: block; margin-bottom: 8px; color: #333; font-weight: 600;">
-                        Gmail API Client ID:
-                    </label>
-                    <input
-                        type="text"
-                        id="clientId"
-                        placeholder="123456789-abc123.apps.googleusercontent.com"
-                        style="width: 100%; box-sizing: border-box; padding: 12px; border: 2px solid #FFD6E0; border-radius: 8px; font-size: 14px;"
-                    />
-                </div>
-
-                <button class="command-button" style="width: 100%; justify-content: center;" onclick="app.saveClientId()">
-                    <span class="command-icon">🔗</span>
-                    <span class="command-text"><strong>Save & Connect to Gmail</strong></span>
-                </button>
-            </div>
-        </div>
-
         <div id="mainSection" class="hidden">
             <div class="status">
                 <div class="status-text" id="statusText">Ready to start</div>
-                <div class="status-detail" id="statusDetail">Click or say "Play Emails" to begin</div>
+                <div class="status-detail" id="statusDetail">Click or say "Start Reading Emails" to begin</div>
             </div>
 
             <div id="dictationDisplay" class="dictation-display hidden">
@@ -530,7 +495,7 @@
         class EmailReaderModel {
             constructor() {
                 // Authentication
-                this.clientId = localStorage.getItem('gmailClientId') || '';
+                this.clientId = '2680769250-3c7t35tjdqj54jbld3n39bsje5flrlen.apps.googleusercontent.com';
                 this.accessToken = null;
                 this.userEmail = null;
 
@@ -540,10 +505,10 @@
                 this.seenEmailIds = new Set();
 
                 // App state - simple string describing what's happening
-                // Possible states: 'setup', 'welcome', 'idle', 'loading', 'reading', 'dictating',
+                // Possible states: 'welcome', 'idle', 'loading', 'reading', 'dictating',
                 //                  'confirming-reply-type', 'confirming-send', 'confirming-forward-recipient',
                 //                  'confirming-forward', 'confirming-forward-message'
-                this.state = 'setup';
+                this.state = 'idle';
 
                 // Pending action data (for multi-step flows like reply/forward)
                 this.pendingAction = null;
@@ -623,7 +588,6 @@
             constructor() {
                 this.elements = {
                     welcomeScreen: document.getElementById('welcomeScreen'),
-                    setupSection: document.getElementById('setupSection'),
                     mainSection: document.getElementById('mainSection'),
                     statusText: document.getElementById('statusText'),
                     statusDetail: document.getElementById('statusDetail'),
@@ -638,7 +602,6 @@
                     dictationText: document.getElementById('dictationText'),
                     buttonContainer: document.getElementById('buttonContainer'),
                     commandsSection: document.getElementById('commandsSection'),
-                    clientIdInput: document.getElementById('clientId'),
                     attachmentsDisplay: document.getElementById('attachmentsDisplay'),
                     attachmentsList: document.getElementById('attachmentsList')
                 };
@@ -647,7 +610,6 @@
             // Show/hide welcome screen
             showWelcome() {
                 this.elements.welcomeScreen.classList.remove('hidden');
-                this.elements.setupSection.classList.add('hidden');
                 this.elements.mainSection.classList.add('hidden');
             }
 
@@ -655,16 +617,8 @@
                 this.elements.welcomeScreen.classList.add('hidden');
             }
 
-            // Show/hide setup vs main sections
-            showSetup() {
-                this.elements.welcomeScreen.classList.add('hidden');
-                this.elements.setupSection.classList.remove('hidden');
-                this.elements.mainSection.classList.add('hidden');
-            }
-
             showMain() {
                 this.elements.welcomeScreen.classList.add('hidden');
-                this.elements.setupSection.classList.add('hidden');
                 this.elements.mainSection.classList.remove('hidden');
             }
 
@@ -1669,7 +1623,7 @@
                     },
                     // Main control commands
                     {
-                        id: 'start', icon: '▶️', label: 'Play Emails',
+                        id: 'start', icon: '▶️', label: 'Start Reading Emails',
                         voiceMatch: (cmd) => cmd.includes('start') || cmd.includes('play') || cmd.includes('begin'),
                         isAvailable: () => m.isAuthenticated && (m.state === 'idle' || m.state === 'reading') && !m.hasEmail,
                         execute: () => this.startReading()
@@ -1843,11 +1797,7 @@
             updateView() {
                 const m = this.model;
 
-                // Show setup, welcome, or main section
-                if (m.state === 'setup') {
-                    this.view.showSetup();
-                    return;
-                }
+                // Show welcome or main section
                 if (m.state === 'welcome') {
                     this.view.showWelcome();
                     return;
@@ -1921,16 +1871,13 @@
                     this.onWelcomeScreenTap();
                 });
 
-                if (this.model.clientId) {
-                    this.gmail.initAuth(async () => {
-                        // Pre-fetch user email so we can say "you" instead of their address
-                        await this.gmail.getMyEmail();
-                        // Show welcome screen (requires tap to enable audio on iOS)
-                        this.model.setState('welcome');
-                    });
-                } else {
-                    this.model.setState('setup');
-                }
+                // Start OAuth flow - Client ID is embedded in the app
+                this.gmail.initAuth(async () => {
+                    // Pre-fetch user email so we can say "you" instead of their address
+                    await this.gmail.getMyEmail();
+                    // Show welcome screen (requires tap to enable audio on iOS)
+                    this.model.setState('welcome');
+                });
             }
 
             // Handle tap on welcome screen - this user gesture enables iOS audio
@@ -1972,28 +1919,12 @@
                 });
             }
 
-            saveClientId() {
-                const clientId = this.view.elements.clientIdInput.value.trim();
-                if (!clientId) {
-                    alert('Please enter your Gmail API Client ID');
-                    return;
-                }
-                this.model.clientId = clientId;
-                localStorage.setItem('gmailClientId', clientId);
-                this.gmail.initAuth(async () => {
-                    // Pre-fetch user email so we can say "you" instead of their address
-                    await this.gmail.getMyEmail();
-                    // Show welcome screen (requires tap to enable audio on iOS)
-                    this.model.setState('welcome');
-                });
-            }
-
             signOut() {
                 this.gmail.signOut();
                 this.model.emails = [];
                 this.model.currentEmailIndex = 0;
-                this.model.setState('setup');
-                this.view.updateStatus('Signed out', 'Please refresh and sign in again');
+                this.model.setState('idle');
+                this.view.updateStatus('Signed out', 'Please refresh the page to sign in again');
             }
 
             // ========== EMAIL READING ==========
