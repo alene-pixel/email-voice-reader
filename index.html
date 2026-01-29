@@ -1120,6 +1120,7 @@
 
         // ============================================================
         // SPEECH SERVICE - Text-to-speech and speech recognition
+        // Uses sentence chunking for mobile browser compatibility
         // ============================================================
         class SpeechService {
             constructor() {
@@ -1129,6 +1130,7 @@
                 this.onCommand = null; // Callback when voice command is heard
                 this.scrollInterval = null;
                 this.scrollTimeout = null;
+                this.isCancelled = false; // Track cancellation for chunked speech
 
                 this.initRecognition();
             }
@@ -1172,78 +1174,93 @@
                 return false;
             }
 
-            speak(text, onStart = null, onEnd = null) {
+            // Split text into sentences for mobile compatibility
+            // Mobile browsers cut off long utterances, so we chunk by sentence
+            splitIntoSentences(text) {
+                // Split on sentence-ending punctuation followed by space or end
+                // Keep the punctuation with the sentence
+                const sentences = text.match(/[^.!?]+[.!?]+[\s]*/g) || [text];
+                // Filter out empty strings and trim
+                return sentences.map(s => s.trim()).filter(s => s.length > 0);
+            }
+
+            // Speak a single chunk (used internally)
+            speakChunk(text) {
                 return new Promise((resolve) => {
-                    if (this.synthesis.paused) this.synthesis.resume();
-                    this.synthesis.cancel();
+                    if (this.isCancelled) {
+                        resolve();
+                        return;
+                    }
 
+                    this.currentUtterance = new SpeechSynthesisUtterance(text);
+                    this.currentUtterance.rate = 1.0;
+                    this.currentUtterance.pitch = 1.0;
+                    this.currentUtterance.volume = 1.0;
+
+                    this.currentUtterance.onend = () => resolve();
+                    this.currentUtterance.onerror = () => resolve();
+
+                    this.synthesis.speak(this.currentUtterance);
+
+                    // Chrome/mobile bug workaround - resume if paused
                     setTimeout(() => {
-                        this.currentUtterance = new SpeechSynthesisUtterance(text);
-                        this.currentUtterance.rate = 1.0;
-                        this.currentUtterance.pitch = 1.0;
-                        this.currentUtterance.volume = 1.0;
-
-                        this.currentUtterance.onstart = () => {
-                            if (onStart) onStart();
-                        };
-
-                        this.currentUtterance.onend = () => {
-                            if (onEnd) onEnd();
-                            resolve();
-                        };
-
-                        this.currentUtterance.onerror = () => resolve();
-
-                        this.synthesis.speak(this.currentUtterance);
-
-                        // Chrome bug workaround
-                        setTimeout(() => {
-                            if (this.synthesis.paused) this.synthesis.resume();
-                        }, 100);
+                        if (this.synthesis.paused) this.synthesis.resume();
                     }, 100);
                 });
             }
 
-            // Speak with auto-scroll timing
-            speakWithScroll(text, view, headerWordCount, bodyWordCount, scrollDelayWords) {
-                return new Promise((resolve) => {
-                    if (this.synthesis.paused) this.synthesis.resume();
-                    this.synthesis.cancel();
+            // Speak text using chunked sentences for mobile compatibility
+            async speak(text, onStart = null, onEnd = null) {
+                if (this.synthesis.paused) this.synthesis.resume();
+                this.synthesis.cancel();
+                this.isCancelled = false;
 
-                    setTimeout(() => {
-                        this.currentUtterance = new SpeechSynthesisUtterance(text);
-                        this.currentUtterance.rate = 1.0;
+                await new Promise(r => setTimeout(r, 100)); // Brief delay after cancel
 
-                        this.currentUtterance.onstart = () => {
-                            if (bodyWordCount > 0) {
-                                const wordsPerSecond = 2.5;
-                                const headerDurationMs = (headerWordCount / wordsPerSecond) * 1000;
-                                const scrollDelayDurationMs = (scrollDelayWords / wordsPerSecond) * 1000;
-                                const totalDelayMs = headerDurationMs + scrollDelayDurationMs;
-                                const remainingBodyDurationMs = ((bodyWordCount - scrollDelayWords) / wordsPerSecond) * 1000;
+                const sentences = this.splitIntoSentences(text);
 
-                                this.scrollTimeout = setTimeout(() => {
-                                    this.scrollInterval = view.startAutoScroll(remainingBodyDurationMs);
-                                }, totalDelayMs);
-                            }
-                        };
+                if (onStart) onStart();
 
-                        this.currentUtterance.onend = () => {
-                            this.clearScrollTimers();
-                            resolve();
-                        };
+                for (let i = 0; i < sentences.length; i++) {
+                    if (this.isCancelled) break;
+                    await this.speakChunk(sentences[i]);
+                }
 
-                        this.currentUtterance.onerror = () => {
-                            this.clearScrollTimers();
-                            resolve();
-                        };
+                if (onEnd) onEnd();
+            }
 
-                        this.synthesis.speak(this.currentUtterance);
-                        setTimeout(() => {
-                            if (this.synthesis.paused) this.synthesis.resume();
-                        }, 100);
-                    }, 100);
-                });
+            // Speak with auto-scroll timing (uses chunked speech for mobile)
+            async speakWithScroll(text, view, headerWordCount, bodyWordCount, scrollDelayWords) {
+                if (this.synthesis.paused) this.synthesis.resume();
+                this.synthesis.cancel();
+                this.isCancelled = false;
+
+                await new Promise(r => setTimeout(r, 100)); // Brief delay after cancel
+
+                const sentences = this.splitIntoSentences(text);
+
+                // Set up scroll timing on first chunk
+                if (bodyWordCount > 0) {
+                    const wordsPerSecond = 2.5;
+                    const headerDurationMs = (headerWordCount / wordsPerSecond) * 1000;
+                    const scrollDelayDurationMs = (scrollDelayWords / wordsPerSecond) * 1000;
+                    const totalDelayMs = headerDurationMs + scrollDelayDurationMs;
+                    const remainingBodyDurationMs = ((bodyWordCount - scrollDelayWords) / wordsPerSecond) * 1000;
+
+                    this.scrollTimeout = setTimeout(() => {
+                        if (!this.isCancelled) {
+                            this.scrollInterval = view.startAutoScroll(remainingBodyDurationMs);
+                        }
+                    }, totalDelayMs);
+                }
+
+                // Speak all sentences sequentially
+                for (let i = 0; i < sentences.length; i++) {
+                    if (this.isCancelled) break;
+                    await this.speakChunk(sentences[i]);
+                }
+
+                this.clearScrollTimers();
             }
 
             clearScrollTimers() {
@@ -1254,6 +1271,7 @@
             }
 
             cancel() {
+                this.isCancelled = true;
                 this.clearScrollTimers();
                 if (this.synthesis) this.synthesis.cancel();
             }
