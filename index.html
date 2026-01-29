@@ -507,6 +507,9 @@
         // ============================================================
         class EmailReaderView {
             constructor() {
+                // Callback for button clicks (used to unlock audio on mobile)
+                this.onButtonClick = null;
+
                 this.elements = {
                     setupSection: document.getElementById('setupSection'),
                     mainSection: document.getElementById('mainSection'),
@@ -702,7 +705,11 @@
                     if (cmd.type === 'button') {
                         const button = document.createElement('button');
                         button.className = 'command-button';
-                        button.onclick = () => cmd.execute();
+                        button.onclick = async () => {
+                            // Unlock audio on mobile (iOS requires user gesture for speech)
+                            if (this.onButtonClick) await this.onButtonClick();
+                            cmd.execute();
+                        };
                         button.innerHTML = `
                             <span class="command-icon">${cmd.icon}</span>
                             <span class="command-text">
@@ -734,7 +741,9 @@
                         // Wire up the button and enter key
                         const input = container.querySelector('input');
                         const useButton = container.querySelector('button');
-                        useButton.onclick = () => {
+                        useButton.onclick = async () => {
+                            // Unlock audio on mobile
+                            if (this.onButtonClick) await this.onButtonClick();
                             const email = input.value.trim();
                             if (email && email.includes('@')) {
                                 cmd.onSubmit(email);
@@ -1010,7 +1019,37 @@
                 this.scrollInterval = null;
                 this.scrollTimeout = null;
 
+                // iOS/Mobile audio unlock tracking
+                this.audioUnlocked = false;
+                this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+                // Queue for chunked speech on mobile
+                this.speechQueue = [];
+                this.isSpeakingQueue = false;
+
                 this.initRecognition();
+            }
+
+            // iOS requires a user gesture to unlock audio
+            // Call this on first button click/tap
+            unlockAudio() {
+                if (this.audioUnlocked) return Promise.resolve();
+
+                return new Promise((resolve) => {
+                    // Speak empty/silent text to unlock the audio context
+                    const utterance = new SpeechSynthesisUtterance(' ');
+                    utterance.volume = 0.01; // Nearly silent
+                    utterance.onend = () => {
+                        this.audioUnlocked = true;
+                        console.log('Audio unlocked for mobile');
+                        resolve();
+                    };
+                    utterance.onerror = () => {
+                        this.audioUnlocked = true; // Mark as unlocked anyway
+                        resolve();
+                    };
+                    this.synthesis.speak(utterance);
+                });
             }
 
             initRecognition() {
@@ -1052,10 +1091,41 @@
                 return false;
             }
 
+            // Split text into chunks for iOS (which cuts off long utterances)
+            chunkText(text, maxLength = 200) {
+                const chunks = [];
+                const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
+
+                let currentChunk = '';
+                for (const sentence of sentences) {
+                    if ((currentChunk + sentence).length <= maxLength) {
+                        currentChunk += sentence;
+                    } else {
+                        if (currentChunk) chunks.push(currentChunk.trim());
+                        // If single sentence is too long, split by commas or spaces
+                        if (sentence.length > maxLength) {
+                            const parts = sentence.match(new RegExp(`.{1,${maxLength}}(?:\\s|$)`, 'g')) || [sentence];
+                            chunks.push(...parts.map(p => p.trim()).filter(p => p));
+                        } else {
+                            currentChunk = sentence;
+                        }
+                    }
+                }
+                if (currentChunk.trim()) chunks.push(currentChunk.trim());
+                return chunks;
+            }
+
             speak(text, onStart = null, onEnd = null) {
                 return new Promise((resolve) => {
                     if (this.synthesis.paused) this.synthesis.resume();
                     this.synthesis.cancel();
+
+                    // On mobile, chunk the text to avoid iOS cutting it off
+                    if (this.isMobile && text.length > 200) {
+                        const chunks = this.chunkText(text);
+                        this.speakChunks(chunks, onStart, onEnd).then(resolve);
+                        return;
+                    }
 
                     setTimeout(() => {
                         this.currentUtterance = new SpeechSynthesisUtterance(text);
@@ -1084,11 +1154,47 @@
                 });
             }
 
+            // Speak an array of text chunks sequentially (for mobile)
+            async speakChunks(chunks, onStart = null, onEnd = null) {
+                for (let i = 0; i < chunks.length; i++) {
+                    await new Promise((resolve) => {
+                        setTimeout(() => {
+                            const utterance = new SpeechSynthesisUtterance(chunks[i]);
+                            utterance.rate = 1.0;
+                            utterance.pitch = 1.0;
+                            utterance.volume = 1.0;
+
+                            if (i === 0 && onStart) {
+                                utterance.onstart = onStart;
+                            }
+
+                            utterance.onend = () => resolve();
+                            utterance.onerror = () => resolve();
+
+                            this.synthesis.speak(utterance);
+
+                            // Chrome/iOS bug workaround
+                            setTimeout(() => {
+                                if (this.synthesis.paused) this.synthesis.resume();
+                            }, 100);
+                        }, 50);
+                    });
+                }
+                if (onEnd) onEnd();
+            }
+
             // Speak with auto-scroll timing
             speakWithScroll(text, view, headerWordCount, bodyWordCount, scrollDelayWords) {
                 return new Promise((resolve) => {
                     if (this.synthesis.paused) this.synthesis.resume();
                     this.synthesis.cancel();
+
+                    // On mobile, use chunked speaking instead
+                    if (this.isMobile && text.length > 200) {
+                        const chunks = this.chunkText(text);
+                        this.speakChunksWithScroll(chunks, view, headerWordCount, bodyWordCount, scrollDelayWords).then(resolve);
+                        return;
+                    }
 
                     setTimeout(() => {
                         this.currentUtterance = new SpeechSynthesisUtterance(text);
@@ -1124,6 +1230,45 @@
                         }, 100);
                     }, 100);
                 });
+            }
+
+            // Mobile version: speak chunks with scroll timing
+            async speakChunksWithScroll(chunks, view, headerWordCount, bodyWordCount, scrollDelayWords) {
+                // Start scroll timing on first chunk
+                let scrollStarted = false;
+                const totalWords = chunks.join(' ').split(/\s+/).length;
+                const wordsPerSecond = 2.5;
+                const totalDurationMs = (totalWords / wordsPerSecond) * 1000;
+
+                // Start scroll after header words are spoken
+                if (bodyWordCount > 0) {
+                    const headerDurationMs = (headerWordCount / wordsPerSecond) * 1000;
+                    this.scrollTimeout = setTimeout(() => {
+                        this.scrollInterval = view.startAutoScroll(totalDurationMs - headerDurationMs);
+                        scrollStarted = true;
+                    }, headerDurationMs);
+                }
+
+                // Speak each chunk
+                for (let i = 0; i < chunks.length; i++) {
+                    await new Promise((resolve) => {
+                        setTimeout(() => {
+                            const utterance = new SpeechSynthesisUtterance(chunks[i]);
+                            utterance.rate = 1.0;
+                            utterance.onend = () => resolve();
+                            utterance.onerror = () => resolve();
+
+                            this.synthesis.speak(utterance);
+
+                            // iOS bug workaround
+                            setTimeout(() => {
+                                if (this.synthesis.paused) this.synthesis.resume();
+                            }, 100);
+                        }, 50);
+                    });
+                }
+
+                this.clearScrollTimers();
             }
 
             clearScrollTimers() {
@@ -1454,6 +1599,9 @@
                 this.view.elements.dictationText.addEventListener('input', () => {
                     this.resetDictationTimeout();
                 });
+
+                // Wire up audio unlock for mobile (iOS requires user gesture)
+                this.view.onButtonClick = () => this.speech.unlockAudio();
             }
 
             // ========== COMMAND SYSTEM ==========
@@ -1772,7 +1920,6 @@
                         this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
                         setTimeout(() => {
                             this.speech.startListening();
-                            this.view.setListening(true);
                         }, 1000);
                     });
                 } else {
@@ -1780,7 +1927,10 @@
                 }
             }
 
-            saveClientId() {
+            async saveClientId() {
+                // Unlock audio on mobile (iOS requires user gesture)
+                await this.speech.unlockAudio();
+
                 const clientId = this.view.elements.clientIdInput.value.trim();
                 if (!clientId) {
                     alert('Please enter your Gmail API Client ID');
@@ -1795,7 +1945,6 @@
                     this.view.updateStatus('Connected to Gmail', 'Ready to read your unread emails');
                     setTimeout(() => {
                         this.speech.startListening();
-                        this.view.setListening(true);
                     }, 1000);
                 });
             }
