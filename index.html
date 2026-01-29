@@ -1130,93 +1130,7 @@
                 this.scrollInterval = null;
                 this.scrollTimeout = null;
 
-                // iOS detection - iOS has a bug where long utterances get cut off
-                this.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-                this.MAX_CHUNK_LENGTH = 200; // Safe chunk size for iOS
-
                 this.initRecognition();
-            }
-
-            // Split text into chunks at sentence boundaries for iOS
-            chunkText(text) {
-                if (!this.isIOS || text.length <= this.MAX_CHUNK_LENGTH) {
-                    return [text];
-                }
-
-                const chunks = [];
-                // Split on sentence endings, keeping the punctuation
-                const sentences = text.match(/[^.!?]+[.!?]+\s*/g) || [text];
-                let currentChunk = '';
-
-                for (const sentence of sentences) {
-                    if ((currentChunk + sentence).length <= this.MAX_CHUNK_LENGTH) {
-                        currentChunk += sentence;
-                    } else {
-                        if (currentChunk) {
-                            chunks.push(currentChunk.trim());
-                        }
-                        // If a single sentence is too long, split it further
-                        if (sentence.length > this.MAX_CHUNK_LENGTH) {
-                            const words = sentence.split(/\s+/);
-                            currentChunk = '';
-                            for (const word of words) {
-                                if ((currentChunk + ' ' + word).length <= this.MAX_CHUNK_LENGTH) {
-                                    currentChunk += (currentChunk ? ' ' : '') + word;
-                                } else {
-                                    if (currentChunk) chunks.push(currentChunk.trim());
-                                    currentChunk = word;
-                                }
-                            }
-                        } else {
-                            currentChunk = sentence;
-                        }
-                    }
-                }
-                if (currentChunk.trim()) {
-                    chunks.push(currentChunk.trim());
-                }
-
-                return chunks.length > 0 ? chunks : [text];
-            }
-
-            // Speak a single chunk (used internally)
-            speakChunk(text) {
-                return new Promise((resolve) => {
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.rate = 1.0;
-                    utterance.pitch = 1.0;
-                    utterance.volume = 1.0;
-
-                    utterance.onend = () => resolve();
-                    utterance.onerror = () => resolve();
-
-                    this.synthesis.speak(utterance);
-
-                    // Chrome bug workaround
-                    setTimeout(() => {
-                        if (this.synthesis.paused) this.synthesis.resume();
-                    }, 100);
-                });
-            }
-
-            // Speak multiple chunks sequentially (for iOS)
-            async speakChunks(chunks, onFirstChunkStart = null) {
-                if (this.synthesis.paused) this.synthesis.resume();
-                this.synthesis.cancel();
-                this.isCancelled = false;
-
-                await new Promise(r => setTimeout(r, 100)); // Match original delay
-
-                for (let i = 0; i < chunks.length; i++) {
-                    if (this.isCancelled) break;
-
-                    if (i === 0 && onFirstChunkStart) {
-                        onFirstChunkStart();
-                    }
-
-                    await this.speakChunk(chunks[i]);
-                }
             }
 
             initRecognition() {
@@ -1259,12 +1173,6 @@
             }
 
             speak(text, onStart = null, onEnd = null) {
-                // iOS: Use chunked speech for longer texts
-                if (this.isIOS && text.length > this.MAX_CHUNK_LENGTH) {
-                    return this.speakChunkedWithCallbacks(text, onStart, onEnd);
-                }
-
-                // Desktop or short text: Use single utterance
                 return new Promise((resolve) => {
                     if (this.synthesis.paused) this.synthesis.resume();
                     this.synthesis.cancel();
@@ -1296,35 +1204,8 @@
                 });
             }
 
-            // iOS-specific: Speak chunked text with start/end callbacks
-            async speakChunkedWithCallbacks(text, onStart, onEnd) {
-                if (this.synthesis.paused) this.synthesis.resume();
-                this.synthesis.cancel();
-                this.isCancelled = false;
-
-                const chunks = this.chunkText(text);
-                console.log(`iOS chunked speak: ${chunks.length} chunks`);
-
-                await new Promise(r => setTimeout(r, 100));
-
-                for (let i = 0; i < chunks.length; i++) {
-                    if (this.isCancelled) break;
-
-                    if (i === 0 && onStart) onStart();
-                    await this.speakChunk(chunks[i]);
-                }
-
-                if (onEnd) onEnd();
-            }
-
-            // Speak with auto-scroll timing (uses chunking on iOS)
+            // Speak with auto-scroll timing
             speakWithScroll(text, view, headerWordCount, bodyWordCount, scrollDelayWords) {
-                // iOS: Use chunked speech to avoid utterance cutoff bug
-                if (this.isIOS) {
-                    return this.speakWithScrollChunked(text, view, headerWordCount, bodyWordCount, scrollDelayWords);
-                }
-
-                // Desktop: Use single utterance (original behavior)
                 return new Promise((resolve) => {
                     if (this.synthesis.paused) this.synthesis.resume();
                     this.synthesis.cancel();
@@ -1365,39 +1246,6 @@
                 });
             }
 
-            // iOS-specific: Speak text in chunks to avoid iOS speech cutoff bug
-            async speakWithScrollChunked(text, view, headerWordCount, bodyWordCount, scrollDelayWords) {
-                if (this.synthesis.paused) this.synthesis.resume();
-                this.synthesis.cancel();
-                this.isCancelled = false;
-
-                const chunks = this.chunkText(text);
-                console.log(`iOS chunked speech: ${chunks.length} chunks for ${text.length} chars`);
-
-                await new Promise(r => setTimeout(r, 100));
-
-                // Start auto-scroll after header portion
-                if (bodyWordCount > 0) {
-                    const wordsPerSecond = 2.5;
-                    const headerDurationMs = (headerWordCount / wordsPerSecond) * 1000;
-                    const scrollDelayDurationMs = (scrollDelayWords / wordsPerSecond) * 1000;
-                    const totalDelayMs = headerDurationMs + scrollDelayDurationMs;
-                    const remainingBodyDurationMs = ((bodyWordCount - scrollDelayWords) / wordsPerSecond) * 1000;
-
-                    this.scrollTimeout = setTimeout(() => {
-                        this.scrollInterval = view.startAutoScroll(remainingBodyDurationMs);
-                    }, totalDelayMs);
-                }
-
-                // Speak each chunk sequentially
-                for (const chunk of chunks) {
-                    if (this.isCancelled) break;
-                    await this.speakChunk(chunk);
-                }
-
-                this.clearScrollTimers();
-            }
-
             clearScrollTimers() {
                 if (this.scrollInterval) clearInterval(this.scrollInterval);
                 if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
@@ -1406,7 +1254,6 @@
             }
 
             cancel() {
-                this.isCancelled = true; // Stop chunked speech loop on iOS
                 this.clearScrollTimers();
                 if (this.synthesis) this.synthesis.cancel();
             }
