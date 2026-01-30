@@ -341,12 +341,6 @@
             align-items: center;
             z-index: 1000;
             cursor: pointer;
-            /* iOS Safari tap fixes */
-            touch-action: manipulation;
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            user-select: none;
-            -webkit-user-select: none;
         }
 
         #welcomeScreen.hidden {
@@ -356,18 +350,12 @@
         .welcome-content {
             text-align: center;
             padding: 40px;
-            pointer-events: none;  /* Pass taps through to parent */
         }
 
         .welcome-text {
             margin-top: 40px;
             opacity: 0;
             animation: fadeInUp 0.8s ease-out 0.8s forwards;
-            pointer-events: none;  /* Pass taps through to parent */
-        }
-
-        .welcome-cta, .tap-icon {
-            pointer-events: none;  /* Pass taps through to parent */
         }
 
         @keyframes fadeInUp {
@@ -412,7 +400,7 @@
 </head>
 <body>
     <!-- Welcome Screen - appears after Gmail auth to enable iOS audio -->
-    <div id="welcomeScreen" ontouchstart="if(window.emailApp) emailApp.onWelcomeScreenTap();" onclick="if(window.emailApp) emailApp.onWelcomeScreenTap();">
+    <div id="welcomeScreen">
         <div class="welcome-content">
             <div class="welcome-text">
                 <div class="welcome-cta">Tap anywhere to hear your emails.</div>
@@ -1881,27 +1869,12 @@
 
             // ========== INITIALIZATION ==========
             init() {
-                // Set up welcome screen click handler (with iOS Safari fixes)
-                const welcomeEl = this.view.elements.welcomeScreen;
-
-                // For desktop browsers
-                welcomeEl.addEventListener('click', () => this.onWelcomeScreenTap());
-
-                // For iOS Safari - use touchstart for immediate response (more reliable than touchend)
-                welcomeEl.addEventListener('touchstart', (e) => {
+                // Set up welcome screen click handler
+                this.view.elements.welcomeScreen.addEventListener('click', () => this.onWelcomeScreenTap());
+                this.view.elements.welcomeScreen.addEventListener('touchend', (e) => {
                     e.preventDefault();
                     this.onWelcomeScreenTap();
-                }, { passive: false });
-
-                // Document-level fallback for iOS Safari (catches taps anywhere)
-                const docTouchHandler = (e) => {
-                    if (!welcomeEl.classList.contains('hidden')) {
-                        e.preventDefault();
-                        document.removeEventListener('touchstart', docTouchHandler);
-                        this.onWelcomeScreenTap();
-                    }
-                };
-                document.addEventListener('touchstart', docTouchHandler, { passive: false });
+                });
 
                 // Start OAuth flow - Client ID is embedded in the app
                 this.gmail.initAuth(async () => {
@@ -2446,9 +2419,6 @@
         const gmail = new GmailService(model);
         const speech = new SpeechService();
         const app = new EmailReaderController(model, view, gmail, speech);
-
-        // Expose globally for iOS Safari inline handler fallback
-        window.emailApp = app;
 
         window.onload = () => app.init();
     </script>
