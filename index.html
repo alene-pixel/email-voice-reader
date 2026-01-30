@@ -340,7 +340,7 @@
         }
 
         .attachment-name {
-            color: #FF8A9B;
+            color: #333;
             font-weight: 500;
         }
 
@@ -1103,6 +1103,11 @@
                 this.isCancelled = false; // Track cancellation for chunked speech
                 this.speechGeneration = 0; // Increments each time new speech starts, to invalidate old async loops
 
+                // Resume tracking
+                this.remainingSentences = []; // Sentences left to speak when interrupted
+                this.resumeScrollState = null; // Scroll state for resume
+                this.canResume = false; // Whether there's something to resume
+
                 this.initRecognition();
             }
 
@@ -1227,6 +1232,12 @@
 
                 const sentences = this.splitIntoSentences(text);
 
+                // Store for potential resume
+                this.allSentences = sentences;
+                this.currentSentenceIndex = 0;
+                this.resumeView = view;
+                this.canResume = true;
+
                 // Set up scroll timing on first chunk
                 if (bodyWordCount > 0) {
                     const wordsPerSecond = 2.5;
@@ -1245,9 +1256,17 @@
 
                 // Speak all sentences sequentially
                 for (let i = 0; i < sentences.length; i++) {
+                    // Track current position for resume
+                    this.currentSentenceIndex = i;
                     // Check both flag and generation
                     if (this.isCancelled || myGeneration !== this.speechGeneration) break;
                     await this.speakChunk(sentences[i], myGeneration);
+                }
+
+                // If we finished naturally (not cancelled), clear resume state
+                if (!this.isCancelled && myGeneration === this.speechGeneration) {
+                    this.canResume = false;
+                    this.remainingSentences = [];
                 }
 
                 this.clearScrollTimers();
@@ -1263,7 +1282,60 @@
             cancel() {
                 this.isCancelled = true;
                 this.clearScrollTimers();
+
+                // Save remaining sentences for potential resume
+                if (this.allSentences && this.currentSentenceIndex < this.allSentences.length) {
+                    this.remainingSentences = this.allSentences.slice(this.currentSentenceIndex);
+                    this.canResume = true;
+                }
+
                 if (this.synthesis) this.synthesis.cancel();
+            }
+
+            // Resume speaking from where we left off
+            async resume() {
+                if (!this.canResume || !this.remainingSentences || this.remainingSentences.length === 0) {
+                    return false; // Nothing to resume
+                }
+
+                // Increment generation to invalidate any old loops
+                this.speechGeneration++;
+                const myGeneration = this.speechGeneration;
+
+                if (this.synthesis.paused) this.synthesis.resume();
+                this.synthesis.cancel();
+
+                await new Promise(r => setTimeout(r, 100)); // Brief delay after cancel
+
+                this.isCancelled = false;
+
+                // Restore sentences to speak
+                const sentences = this.remainingSentences;
+                this.allSentences = sentences;
+                this.currentSentenceIndex = 0;
+
+                // Speak remaining sentences sequentially
+                for (let i = 0; i < sentences.length; i++) {
+                    this.currentSentenceIndex = i;
+                    if (this.isCancelled || myGeneration !== this.speechGeneration) break;
+                    await this.speakChunk(sentences[i], myGeneration);
+                }
+
+                // If we finished naturally, clear resume state
+                if (!this.isCancelled && myGeneration === this.speechGeneration) {
+                    this.canResume = false;
+                    this.remainingSentences = [];
+                }
+
+                return true;
+            }
+
+            // Clear resume state (call when moving to a different email)
+            clearResumeState() {
+                this.canResume = false;
+                this.remainingSentences = [];
+                this.allSentences = null;
+                this.currentSentenceIndex = 0;
             }
 
             get isSpeaking() {
@@ -1682,6 +1754,12 @@
                         execute: () => this.stopReading()
                     },
                     {
+                        id: 'continue', icon: '▶️', label: 'Continue Reading',
+                        voiceMatch: (cmd) => cmd.includes('continue') || cmd.includes('play') || cmd.includes('keep reading') || cmd.includes('finish reading'),
+                        isAvailable: () => m.state === 'idle' && m.hasEmail,
+                        execute: () => this.continueReading()
+                    },
+                    {
                         id: 'signout', icon: '🚪', label: 'Sign Out',
                         voiceMatch: (cmd) => cmd.includes('sign out') || cmd.includes('logout'),
                         isAvailable: () => m.isAuthenticated && ['idle', 'reading'].includes(m.state),
@@ -2024,10 +2102,29 @@
                 this.speech.cancel();
                 if (this.model.hasEmail) {
                     this.model.setState('idle');
-                    this.view.updateStatus('Stopped reading', 'You can still take actions on this email');
+                    this.view.updateStatus('Stopped reading', 'Say "continue" to resume or take other actions');
                 } else {
                     this.model.setState('idle');
                     this.view.updateStatus('Stopped');
+                }
+            }
+
+            async continueReading() {
+                if (this.speech.canResume) {
+                    this.model.setState('reading');
+                    this.view.updateStatus('Continuing email...');
+                    await this.speech.resume();
+                    // After resume finishes (or is interrupted again), update state
+                    if (!this.speech.isCancelled) {
+                        this.model.setState('idle');
+                        this.view.updateStatus('Finished reading', 'What would you like to do with this email?');
+                    }
+                } else if (this.model.hasEmail) {
+                    // No resume state but we have an email - restart from beginning
+                    await this.speech.speak('Starting email from the beginning.');
+                    this.readCurrentEmail();
+                } else {
+                    await this.speech.speak('No email to continue. Say "start" to check for new emails.');
                 }
             }
 
@@ -2118,6 +2215,7 @@
             }
 
             async nextEmail() {
+                this.speech.clearResumeState(); // Clear resume state when changing emails
                 await this.speech.speak('Moving to next email.');
                 this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
                 this.readCurrentEmail();
@@ -2125,6 +2223,7 @@
 
             async previousEmail() {
                 if (this.model.canGoPrevious) {
+                    this.speech.clearResumeState(); // Clear resume state when changing emails
                     await this.speech.speak('Going back to previous email.');
                     this.model.setCurrentEmailIndex(this.model.currentEmailIndex - 1);
                     this.readCurrentEmail();
@@ -2135,6 +2234,7 @@
 
             // ========== EMAIL ACTIONS ==========
             async markAsRead() {
+                this.speech.clearResumeState(); // Clear resume state when taking action on email
                 this.view.updateStatus('Marking as read...');
                 try {
                     await this.gmail.modifyEmail(this.model.currentEmail.id, [], ['UNREAD']);
@@ -2147,6 +2247,7 @@
             }
 
             async archiveEmail() {
+                this.speech.clearResumeState(); // Clear resume state when taking action on email
                 this.view.updateStatus('Archiving email...');
                 try {
                     await this.gmail.modifyEmail(this.model.currentEmail.id, [], ['INBOX', 'UNREAD']);
@@ -2159,6 +2260,7 @@
             }
 
             async markAsSpam() {
+                this.speech.clearResumeState(); // Clear resume state when taking action on email
                 this.view.updateStatus('Marking as spam...');
                 try {
                     await this.gmail.modifyEmail(this.model.currentEmail.id, ['SPAM'], ['INBOX', 'UNREAD']);
@@ -2399,6 +2501,7 @@
 
             // ========== UNSUBSCRIBE ==========
             async handleUnsubscribe() {
+                this.speech.clearResumeState(); // Clear resume state when taking action on email
                 const fullBody = EmailUtils.extractFullBody(this.model.currentEmail.payload);
                 const match = fullBody.match(/https?:\/\/[^\s<>"]+unsubscribe[^\s<>"]*/i);
 
