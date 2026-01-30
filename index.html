@@ -692,22 +692,6 @@
                 this.elements.attachmentsDisplay.classList.add('hidden');
             }
 
-            getAttachmentIcon(filename) {
-                const ext = filename.split('.').pop().toLowerCase();
-                const icons = {
-                    'pdf': '📕',
-                    'doc': '📘', 'docx': '📘',
-                    'xls': '📗', 'xlsx': '📗',
-                    'ppt': '📙', 'pptx': '📙',
-                    'txt': '📄', 'md': '📄', 'csv': '📄',
-                    'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️',
-                    'zip': '🗜️', 'rar': '🗜️',
-                    'mp3': '🎵', 'wav': '🎵',
-                    'mp4': '🎬', 'mov': '🎬'
-                };
-                return icons[ext] || '📎';
-            }
-
             getHeader(headers, name) {
                 const header = headers.find(h => h.name.toLowerCase() === name.toLowerCase());
                 return header ? header.value : null;
