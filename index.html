@@ -1774,6 +1774,13 @@
                     this.view.showWelcome();
                     return;
                 }
+
+                // Only show main section after authentication
+                // This prevents the main UI from flashing before the welcome screen appears
+                if (!m.isAuthenticated) {
+                    return;
+                }
+
                 this.view.showMain();
 
                 // Show/hide email display
