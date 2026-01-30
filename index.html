@@ -2458,21 +2458,8 @@
                     );
 
                     if (result.success) {
-                        // Limit text length for very long documents
-                        let textToRead = result.text;
-                        const maxChars = 10000;
-                        let truncated = false;
-
-                        if (textToRead.length > maxChars) {
-                            textToRead = textToRead.substring(0, maxChars);
-                            truncated = true;
-                        }
-
+                        const textToRead = result.text;
                         await this.speech.speak(`Content of ${attachment.filename}: ${textToRead}`);
-
-                        if (truncated) {
-                            await this.speech.speak('Note: This document was very long, so I only read the first portion.');
-                        }
                     } else {
                         await this.speech.speak(`Sorry, I could not read ${attachment.filename}. ${result.error}`);
                     }
