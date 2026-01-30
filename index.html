@@ -108,13 +108,18 @@
             line-height: 1.6;
             white-space: pre-wrap;
             max-height: 300px;
-            overflow-y: auto;
+            overflow-y: scroll; /* Changed from auto to always show scrollbar */
             padding-right: 10px;
             scroll-behavior: smooth;
+            /* Force scrollbar to always be visible on mobile */
+            scrollbar-width: thin;
+            scrollbar-color: #FF6B9D #FFD6E0;
         }
 
+        /* Custom scrollbar for webkit browsers (Chrome, Safari, Edge) */
         .email-body::-webkit-scrollbar {
             width: 8px;
+            -webkit-appearance: none; /* Force custom scrollbar on iOS */
         }
 
         .email-body::-webkit-scrollbar-track {
@@ -125,10 +130,20 @@
         .email-body::-webkit-scrollbar-thumb {
             background: #FF6B9D;
             border-radius: 4px;
+            /* Make thumb more visible */
+            min-height: 30px;
         }
 
         .email-body::-webkit-scrollbar-thumb:hover {
             background: #E84C7A;
+        }
+
+        /* iOS-specific: ensure scrollbar doesn't auto-hide */
+        @supports (-webkit-touch-callout: none) {
+            .email-body {
+                /* Force persistent scrollbar on iOS */
+                -webkit-overflow-scrolling: auto;
+            }
         }
 
         .commands {
