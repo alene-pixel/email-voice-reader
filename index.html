@@ -1916,6 +1916,11 @@
                 }
 
                 // No match
+                // If we were reading, change state to idle so Continue button appears
+                if (this.model.state === 'reading' && this.model.hasEmail) {
+                    this.model.setState('idle');
+                    this.view.updateStatus('Stopped reading', 'Say "continue" to resume or take other actions');
+                }
                 this.speech.speak('I did not understand that command. Please try again.');
             }
 
