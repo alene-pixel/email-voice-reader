@@ -1621,7 +1621,7 @@
                     },
                     {
                         id: 'archive', icon: '📦', label: 'Archive',
-                        voiceMatch: (cmd) => cmd.includes('archive'),
+                        voiceMatch: (cmd) => cmd.includes('archive') || cmd.includes('Are by') || cmd.includes('barberry'),
                         isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
                         execute: () => this.archiveEmail()
                     },
