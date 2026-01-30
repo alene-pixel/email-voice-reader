@@ -341,6 +341,12 @@
             align-items: center;
             z-index: 1000;
             cursor: pointer;
+            /* iOS Safari tap fixes */
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         #welcomeScreen.hidden {
@@ -1869,12 +1875,22 @@
 
             // ========== INITIALIZATION ==========
             init() {
-                // Set up welcome screen click handler
+                // Set up welcome screen click handler (with iOS Safari fixes)
                 this.view.elements.welcomeScreen.addEventListener('click', () => this.onWelcomeScreenTap());
+
+                // iOS Safari requires touchstart + touchend with passive: false
+                let touchStarted = false;
+                this.view.elements.welcomeScreen.addEventListener('touchstart', (e) => {
+                    touchStarted = true;
+                }, { passive: true });
+
                 this.view.elements.welcomeScreen.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    this.onWelcomeScreenTap();
-                });
+                    if (touchStarted) {
+                        e.preventDefault();
+                        touchStarted = false;
+                        this.onWelcomeScreenTap();
+                    }
+                }, { passive: false });
 
                 // Start OAuth flow - Client ID is embedded in the app
                 this.gmail.initAuth(async () => {
