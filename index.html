@@ -639,11 +639,30 @@
                     this.elements.emailCc.style.display = 'none';
                 }
 
-                this.elements.emailSubject.innerHTML = `<a href="${gmailUrl}" target="_blank" style="color: #FF6B9D; text-decoration: none;">${subject}</a>`;
+                this.elements.emailSubject.textContent = '';
+                const subjectLink = document.createElement('a');
+                subjectLink.textContent = subject;
+                subjectLink.style.color = '#FF6B9D';
+                subjectLink.style.textDecoration = 'none';
+                subjectLink.target = '_blank';
+                subjectLink.rel = 'noopener noreferrer';
+                try {
+                    const parsedUrl = new URL(gmailUrl);
+                    if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+                        subjectLink.href = parsedUrl.toString();
+                    }
+                } catch (e) {
+                    // If the URL is invalid, fall back to plain text without a link.
+                }
+                if (subjectLink.href) {
+                    this.elements.emailSubject.appendChild(subjectLink);
+                } else {
+                    this.elements.emailSubject.textContent = subject;
+                }
                 this.elements.emailDate.textContent = this.formatDate(date);
                 // Display email body with URLs as clickable links (shortened for readability)
                 const bodyText = EmailUtils.getEmailBody(email);
-                this.elements.emailBody.innerHTML = EmailUtils.linkifyUrls(bodyText);
+                EmailUtils.renderLinkifiedText(this.elements.emailBody, bodyText);
                 this.elements.emailBody.scrollTop = 0;
                 this.elements.emailDisplay.classList.remove('hidden');
             }
@@ -659,12 +678,15 @@
                     return;
                 }
 
-                this.elements.attachmentsList.innerHTML = '';
+                this.elements.attachmentsList.textContent = '';
 
                 attachments.forEach(att => {
                     const item = document.createElement('div');
                     item.className = 'attachment-item';
-                    item.innerHTML = `<span class="attachment-name">${att.filename}</span>`;
+                    const name = document.createElement('span');
+                    name.className = 'attachment-name';
+                    name.textContent = att.filename;
+                    item.appendChild(name);
                     this.elements.attachmentsList.appendChild(item);
                 });
 
@@ -713,7 +735,7 @@
 
             // Dictation display
             showDictation(text = '', editable = true) {
-                this.elements.dictationText.innerHTML = text;
+                this.elements.dictationText.textContent = text;
                 this.elements.dictationText.contentEditable = editable ? 'true' : 'false';
                 if (editable) {
                     this.elements.dictationText.classList.remove('disabled');
@@ -947,32 +969,51 @@
             }
 
             // Convert URLs in text to clickable links for display
-            static linkifyUrls(text) {
-                // Escape HTML first to prevent XSS
-                const escaped = text
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;');
+            static renderLinkifiedText(container, text) {
+                const safeText = text ?? '';
+                const urlRegex = /(https?:\/\/[^\s<>"]+)/gi;
+                container.textContent = '';
 
-                // Convert URLs to clickable links with cleaner display
-                return escaped.replace(
-                    /(https?:\/\/[^\s<>"]+)/gi,
-                    (url) => {
-                        // Create a shorter display version of the URL
-                        let displayUrl = url;
-                        try {
-                            const parsed = new URL(url);
-                            // Show just the domain + start of path
-                            displayUrl = parsed.hostname + (parsed.pathname.length > 20
-                                ? parsed.pathname.substring(0, 20) + '...'
-                                : parsed.pathname);
-                        } catch (e) {
-                            // If URL parsing fails, truncate the raw URL
+                let lastIndex = 0;
+                let match;
+
+                while ((match = urlRegex.exec(safeText)) !== null) {
+                    const url = match[0];
+                    if (match.index > lastIndex) {
+                        container.appendChild(document.createTextNode(safeText.slice(lastIndex, match.index)));
+                    }
+
+                    try {
+                        const parsed = new URL(url);
+                        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+                            throw new Error('Unsupported protocol');
+                        }
+
+                        let displayUrl = parsed.hostname + (parsed.pathname.length > 20
+                            ? parsed.pathname.substring(0, 20) + '...'
+                            : parsed.pathname);
+                        if (!displayUrl) {
                             displayUrl = url.length > 40 ? url.substring(0, 40) + '...' : url;
                         }
-                        return `<a href="${url}" target="_blank" style="color: #FF6B9D; text-decoration: underline;">${displayUrl}</a>`;
+
+                        const link = document.createElement('a');
+                        link.href = parsed.toString();
+                        link.target = '_blank';
+                        link.rel = 'noopener noreferrer';
+                        link.style.color = '#FF6B9D';
+                        link.style.textDecoration = 'underline';
+                        link.textContent = displayUrl;
+                        container.appendChild(link);
+                    } catch (e) {
+                        container.appendChild(document.createTextNode(url));
                     }
-                );
+
+                    lastIndex = match.index + url.length;
+                }
+
+                if (lastIndex < safeText.length) {
+                    container.appendChild(document.createTextNode(safeText.slice(lastIndex)));
+                }
             }
 
             static getHeader(email, name) {
