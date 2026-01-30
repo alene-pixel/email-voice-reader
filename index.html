@@ -2007,9 +2007,9 @@
                 this.view.updateStatus('Reading email aloud...');
 
                 const fromRaw = EmailUtils.getHeader(email, 'From') || 'Unknown sender';
-                const subject = EmailUtils.getHeader(email, 'Subject') || 'No subject';
                 const toRaw = EmailUtils.getHeader(email, 'To') || '';
                 const ccRaw = EmailUtils.getHeader(email, 'Cc') || '';
+                const subject = EmailUtils.getHeader(email, 'Subject') || 'No subject';
                 const body = EmailUtils.getEmailBody(email);
 
                 // Replace user's email with "you" for natural speech
