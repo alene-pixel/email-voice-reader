@@ -1754,8 +1754,8 @@
                         execute: () => this.stopReading()
                     },
                     {
-                        id: 'continue', icon: '▶️', label: 'Continue Reading',
-                        voiceMatch: (cmd) => cmd.includes('continue') || cmd.includes('play') || cmd.includes('keep reading') || cmd.includes('finish reading'),
+                        id: 'continue', icon: '▶️', label: 'Play',
+                        voiceMatch: (cmd) => cmd.includes('continue') || cmd.includes('play') || cmd.includes('keep reading') || cmd.includes('finish reading') || cmd.includes('continue reading'),
                         isAvailable: () => m.state === 'idle' && m.hasEmail,
                         execute: () => this.continueReading()
                     },
