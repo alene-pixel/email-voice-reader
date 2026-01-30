@@ -477,10 +477,10 @@
                 this.seenEmailIds = new Set();
 
                 // App state - simple string describing what's happening
-                // Possible states: 'welcome', 'idle', 'loading', 'reading', 'dictating',
+                // Possible states: 'initializing', 'welcome', 'idle', 'loading', 'reading', 'dictating',
                 //                  'confirming-reply-type', 'confirming-send', 'confirming-forward-recipient',
                 //                  'confirming-forward', 'confirming-forward-message'
-                this.state = 'idle';
+                this.state = 'initializing';
 
                 // Pending action data (for multi-step flows like reply/forward)
                 this.pendingAction = null;
@@ -1769,9 +1769,9 @@
             updateView() {
                 const m = this.model;
 
-                // Show welcome or main section
-                if (m.state === 'welcome') {
-                    this.view.showWelcome();
+                // During initialization, keep welcome screen visible and don't show main
+                // This prevents the main UI from flashing before OAuth completes
+                if (m.state === 'initializing' || m.state === 'welcome') {
                     return;
                 }
                 this.view.showMain();
