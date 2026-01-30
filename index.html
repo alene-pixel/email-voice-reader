@@ -1380,24 +1380,43 @@
                 }
             }
 
-            initAuth(onSuccess) {
-                google.accounts.id.initialize({
-                    client_id: this.model.clientId,
-                    callback: () => {}
-                });
+            initAuth(onSuccess, onError) {
+                // Check if Google Identity Services loaded
+                if (typeof google === 'undefined' || !google.accounts) {
+                    console.error('Google Identity Services not loaded');
+                    if (onError) onError('Google sign-in is not available. Please check if content blockers are disabled for this site.');
+                    return;
+                }
 
-                const tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: this.model.clientId,
-                    scope: this.SCOPES,
-                    callback: (response) => {
-                        if (response.access_token) {
-                            this.model.setAccessToken(response.access_token);
-                            onSuccess();
+                try {
+                    google.accounts.id.initialize({
+                        client_id: this.model.clientId,
+                        callback: () => {}
+                    });
+
+                    const tokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: this.model.clientId,
+                        scope: this.SCOPES,
+                        callback: (response) => {
+                            if (response.access_token) {
+                                this.model.setAccessToken(response.access_token);
+                                onSuccess();
+                            } else if (response.error) {
+                                console.error('OAuth error:', response.error);
+                                if (onError) onError('Sign-in failed: ' + response.error);
+                            }
+                        },
+                        error_callback: (error) => {
+                            console.error('OAuth error callback:', error);
+                            if (onError) onError('Sign-in error: ' + (error.message || 'Unknown error'));
                         }
-                    }
-                });
+                    });
 
-                tokenClient.requestAccessToken();
+                    tokenClient.requestAccessToken();
+                } catch (e) {
+                    console.error('initAuth exception:', e);
+                    if (onError) onError('Sign-in initialization failed: ' + e.message);
+                }
             }
 
             signOut() {
@@ -1877,12 +1896,23 @@
                 });
 
                 // Start OAuth flow - Client ID is embedded in the app
-                this.gmail.initAuth(async () => {
-                    // Pre-fetch user email so we can say "you" instead of their address
-                    await this.gmail.getMyEmail();
-                    // Show welcome screen (requires tap to enable audio on iOS)
-                    this.model.setState('welcome');
-                });
+                this.gmail.initAuth(
+                    async () => {
+                        // Pre-fetch user email so we can say "you" instead of their address
+                        await this.gmail.getMyEmail();
+                        // Show welcome screen (requires tap to enable audio on iOS)
+                        this.model.setState('welcome');
+                    },
+                    (errorMsg) => {
+                        // OAuth failed - show error on welcome screen
+                        console.error('Auth failed:', errorMsg);
+                        const ctaEl = document.querySelector('.welcome-cta');
+                        if (ctaEl) {
+                            ctaEl.innerHTML = '⚠️ ' + errorMsg + '<br><br>Try opening in Chrome, or disable content blockers in Safari settings.';
+                            ctaEl.style.fontSize = '20px';
+                        }
+                    }
+                );
             }
 
             // Handle tap on welcome screen - this user gesture enables iOS audio
@@ -2420,7 +2450,21 @@
         const speech = new SpeechService();
         const app = new EmailReaderController(model, view, gmail, speech);
 
-        window.onload = () => app.init();
+        window.onload = () => {
+            app.init();
+
+            // Timeout check: if still initializing after 8 seconds, show error
+            setTimeout(() => {
+                if (model.state === 'initializing') {
+                    console.error('Timeout: Google Identity Services may be blocked');
+                    const ctaEl = document.querySelector('.welcome-cta');
+                    if (ctaEl) {
+                        ctaEl.innerHTML = '⚠️ Google sign-in is not loading.<br><br>This may be caused by content blockers or Safari privacy settings.<br><br>Try: Settings → Safari → Content Blockers → disable for this site, or use Chrome instead.';
+                        ctaEl.style.fontSize = '18px';
+                    }
+                }
+            }, 8000);
+        };
     </script>
 </body>
 </html>
