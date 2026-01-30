@@ -1663,12 +1663,16 @@
                 // Filter to only available commands and format for view
                 for (const cmd of allCommands) {
                     if (cmd.isAvailable()) {
+                        const originalExecute = cmd.execute;
                         commands.push({
                             type: 'button',
                             id: cmd.id,
                             icon: cmd.icon,
                             label: cmd.label,
-                            execute: cmd.execute
+                            execute: () => {
+                                this.speech.cancel(); // Stop any ongoing speech immediately
+                                originalExecute();
+                            }
                         });
                     }
                 }
@@ -1687,20 +1691,29 @@
                             icon: '👤',
                             label: name || email,
                             sublabel: name ? email : null,
-                            execute: () => this.resolvePending(recipient)
+                            execute: () => {
+                                this.speech.cancel(); // Stop any ongoing speech immediately
+                                this.resolvePending(recipient);
+                            }
                         });
                     }
 
                     commands.push({
                         type: 'email-input',
-                        onSubmit: (email) => this.resolvePending(email)
+                        onSubmit: (email) => {
+                            this.speech.cancel(); // Stop any ongoing speech immediately
+                            this.resolvePending(email);
+                        }
                     });
 
                     commands.push({
                         type: 'button',
                         icon: '✗',
                         label: 'Cancel Forward',
-                        execute: () => this.resolvePending('cancel')
+                        execute: () => {
+                            this.speech.cancel(); // Stop any ongoing speech immediately
+                            this.resolvePending('cancel');
+                        }
                     });
                 }
 
