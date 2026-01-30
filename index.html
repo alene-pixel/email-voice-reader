@@ -1065,6 +1065,7 @@
                 this.scrollInterval = null;
                 this.scrollTimeout = null;
                 this.isCancelled = false; // Track cancellation for chunked speech
+                this.speechGeneration = 0; // Increments each time new speech starts, to invalidate old async loops
 
                 this.initRecognition();
             }
@@ -1119,9 +1120,11 @@
             }
 
             // Speak a single chunk (used internally)
-            speakChunk(text) {
+            // generation parameter ensures old async loops don't continue after new speech starts
+            speakChunk(text, generation) {
                 return new Promise((resolve) => {
-                    if (this.isCancelled) {
+                    // Check both cancellation flag AND generation to catch stale async loops
+                    if (this.isCancelled || generation !== this.speechGeneration) {
                         resolve();
                         return;
                     }
@@ -1145,19 +1148,27 @@
 
             // Speak text using chunked sentences for mobile compatibility
             async speak(text, onStart = null, onEnd = null) {
+                // Increment generation FIRST to invalidate any old async speech loops
+                this.speechGeneration++;
+                const myGeneration = this.speechGeneration;
+
                 if (this.synthesis.paused) this.synthesis.resume();
                 this.synthesis.cancel();
-                this.isCancelled = false;
+                // Keep isCancelled true during delay so old loops can see it and exit
 
                 await new Promise(r => setTimeout(r, 100)); // Brief delay after cancel
+
+                // NOW safe to reset - old loops have had time to check and exit
+                this.isCancelled = false;
 
                 const sentences = this.splitIntoSentences(text);
 
                 if (onStart) onStart();
 
                 for (let i = 0; i < sentences.length; i++) {
-                    if (this.isCancelled) break;
-                    await this.speakChunk(sentences[i]);
+                    // Check both flag and generation
+                    if (this.isCancelled || myGeneration !== this.speechGeneration) break;
+                    await this.speakChunk(sentences[i], myGeneration);
                 }
 
                 if (onEnd) onEnd();
@@ -1165,11 +1176,18 @@
 
             // Speak with auto-scroll timing (uses chunked speech for mobile)
             async speakWithScroll(text, view, headerWordCount, bodyWordCount, scrollDelayWords) {
+                // Increment generation FIRST to invalidate any old async speech loops
+                this.speechGeneration++;
+                const myGeneration = this.speechGeneration;
+
                 if (this.synthesis.paused) this.synthesis.resume();
                 this.synthesis.cancel();
-                this.isCancelled = false;
+                // Keep isCancelled true during delay so old loops can see it and exit
 
                 await new Promise(r => setTimeout(r, 100)); // Brief delay after cancel
+
+                // NOW safe to reset - old loops have had time to check and exit
+                this.isCancelled = false;
 
                 const sentences = this.splitIntoSentences(text);
 
@@ -1182,7 +1200,8 @@
                     const remainingBodyDurationMs = ((bodyWordCount - scrollDelayWords) / wordsPerSecond) * 1000;
 
                     this.scrollTimeout = setTimeout(() => {
-                        if (!this.isCancelled) {
+                        // Also check generation for scroll timer
+                        if (!this.isCancelled && myGeneration === this.speechGeneration) {
                             this.scrollInterval = view.startAutoScroll(remainingBodyDurationMs);
                         }
                     }, totalDelayMs);
@@ -1190,8 +1209,9 @@
 
                 // Speak all sentences sequentially
                 for (let i = 0; i < sentences.length; i++) {
-                    if (this.isCancelled) break;
-                    await this.speakChunk(sentences[i]);
+                    // Check both flag and generation
+                    if (this.isCancelled || myGeneration !== this.speechGeneration) break;
+                    await this.speakChunk(sentences[i], myGeneration);
                 }
 
                 this.clearScrollTimers();
