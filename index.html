@@ -1755,7 +1755,7 @@
                     },
                     {
                         id: 'continue', icon: '▶️', label: 'Play',
-                        voiceMatch: (cmd) => cmd.includes('continue') || cmd.includes('play') || cmd.includes('keep reading') || cmd.includes('finish reading') || cmd.includes('continue reading'),
+                        voiceMatch: (cmd) => cmd.includes('continue') || cmd.includes('play') || cmd.includes('keep reading') || cmd.includes('finish reading') || cmd.includes('continue reading') || cmd.includes('continue email') || cmd.includes('finish reading email') || cmd.includes('keep reading email'),
                         isAvailable: () => m.state === 'idle' && m.hasEmail,
                         execute: () => this.continueReading()
                     },
