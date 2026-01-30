@@ -1749,7 +1749,7 @@
                     },
                     {
                         id: 'stop', icon: '⏹️', label: 'Stop',
-                        voiceMatch: (cmd) => cmd.includes('stop'),
+                        voiceMatch: (cmd) => cmd.includes('stop') || cmd.includes('pause') || cmd.includes('wait') || cmd.includes('hold on'),
                         isAvailable: () => m.state === 'reading' && m.hasEmail,
                         execute: () => this.stopReading()
                     },
