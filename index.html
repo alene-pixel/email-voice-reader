@@ -474,7 +474,6 @@
                 // Email state
                 this.emails = [];
                 this.currentEmailIndex = 0;
-                this.seenEmailIds = new Set();
 
                 // App state - simple string describing what's happening
                 // Possible states: 'initializing', 'welcome', 'idle', 'loading', 'reading', 'dictating',
@@ -482,16 +481,12 @@
                 //                  'confirming-forward', 'confirming-forward-message'
                 this.state = 'initializing';
 
-                // Pending action data (for multi-step flows like reply/forward)
-                this.pendingAction = null;
-
                 // Dictation state
                 this.dictatedText = '';
                 this.isDictationEditable = true;
 
                 // Forward-specific state
                 this.recentRecipients = null;
-                this.selectedForwardRecipient = null;
 
                 // Reply-specific state
                 this.isReplyAll = false;
@@ -2008,7 +2003,6 @@
                 if (!this.model.isAuthenticated) return;
 
                 this.model.setCurrentEmailIndex(0);
-                this.model.seenEmailIds = new Set();
                 this.model.setState('loading');
                 this.view.updateStatus('Fetching unread emails...');
 
