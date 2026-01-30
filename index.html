@@ -2038,22 +2038,24 @@
                 }
                 headerText += ` Subject: ${subject}.`;
 
-                // Add attachment announcement
+                // Strip URLs from body for speech (so links aren't read aloud)
+                const bodyForSpeech = EmailUtils.stripUrlsForSpeech(body);
+
+                // Add attachment announcement after the body
+                let attachmentText = '';
                 if (attachments.length > 0) {
                     const attachmentNames = attachments.map(a => a.filename).join(', ');
                     if (attachments.length === 1) {
-                        headerText += ` This email has 1 attachment: ${attachmentNames}.`;
+                        attachmentText += ` This email has 1 attachment: ${attachmentNames}.`;
                     } else {
-                        headerText += ` This email has ${attachments.length} attachments: ${attachmentNames}.`;
+                        attachmentText += ` This email has ${attachments.length} attachments: ${attachmentNames}.`;
                     }
                     if (readableAttachments.length > 0) {
-                        headerText += ` Say "read attachments" to hear ${readableAttachments.length === 1 ? 'it' : 'them'}.`;
+                        attachmentText += ` Say "read attachments" to hear ${readableAttachments.length === 1 ? 'it' : 'them'}.`;
                     }
                 }
 
-                // Strip URLs from body for speech (so links aren't read aloud)
-                const bodyForSpeech = EmailUtils.stripUrlsForSpeech(body);
-                const fullText = headerText + ' ' + bodyForSpeech;
+                const fullText = headerText + ' ' + bodyForSpeech + attachmentText;
                 const headerWords = headerText.split(/\s+/).length;
                 const bodyWords = bodyForSpeech.split(/\s+/).length;
 
