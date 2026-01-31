@@ -2107,7 +2107,7 @@
                 this.speech.cancel();
                 if (this.model.hasEmail) {
                     this.model.setState('idle');
-                    this.view.updateStatus('Stopped reading', 'Say "continue" to resume or take other actions');
+                    this.view.updateStatus('Stopped reading', 'Say "play" to continue');
                 } else {
                     this.model.setState('idle');
                     this.view.updateStatus('Stopped');
