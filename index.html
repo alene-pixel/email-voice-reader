@@ -1129,6 +1129,8 @@
                 // Character-based scroll progress tracking
                 this.totalCharacters = 0;
                 this.charactersSpoken = 0;
+                this.scrollStartThreshold = 0; // Don't scroll until this many chars spoken
+                this.scrollableCharacters = 0; // Chars after threshold that map to scroll
 
                 this.initRecognition();
             }
@@ -1239,7 +1241,8 @@
 
             // Speak with synchronized scrolling (uses chunked speech for mobile)
             // Scrolls based on character progress through the text
-            async speakWithScroll(text, view) {
+            // scrollStartThreshold: don't scroll until this many characters have been spoken
+            async speakWithScroll(text, view, scrollStartThreshold = 0) {
                 // Increment generation FIRST to invalidate any old async speech loops
                 this.speechGeneration++;
                 const myGeneration = this.speechGeneration;
@@ -1265,8 +1268,13 @@
                 const totalCharacters = sentences.reduce((sum, s) => sum + s.length, 0);
                 let charactersSpoken = 0;
 
+                // Characters that map to scroll (after threshold)
+                const scrollableCharacters = Math.max(0, totalCharacters - scrollStartThreshold);
+
                 // Store for resume
                 this.totalCharacters = totalCharacters;
+                this.scrollStartThreshold = scrollStartThreshold;
+                this.scrollableCharacters = scrollableCharacters;
                 this.charactersSpoken = 0;
 
                 // Speak all sentences sequentially with synchronized scrolling
@@ -1278,10 +1286,10 @@
                     // Check both flag and generation
                     if (this.isCancelled || myGeneration !== this.speechGeneration) break;
 
-                    // Scroll to current progress based on characters spoken
-                    if (totalCharacters > 0) {
-                        const progress = charactersSpoken / totalCharacters;
-                        view.scrollToProgress(progress);
+                    // Only scroll after passing the threshold (header + buffer)
+                    if (charactersSpoken >= scrollStartThreshold && scrollableCharacters > 0) {
+                        const scrollProgress = (charactersSpoken - scrollStartThreshold) / scrollableCharacters;
+                        view.scrollToProgress(scrollProgress);
                     }
 
                     await this.speakChunk(sentences[i], myGeneration);
@@ -1331,7 +1339,8 @@
 
                 // Continue character count from where we left off
                 let charactersSpoken = this.charactersSpoken || 0;
-                const totalCharacters = this.totalCharacters || 1;
+                const scrollStartThreshold = this.scrollStartThreshold || 0;
+                const scrollableCharacters = this.scrollableCharacters || 1;
                 const view = this.resumeView;
 
                 // Speak remaining sentences sequentially with synchronized scrolling
@@ -1341,10 +1350,10 @@
 
                     if (this.isCancelled || myGeneration !== this.speechGeneration) break;
 
-                    // Scroll to current progress based on characters spoken
-                    if (view && totalCharacters > 0) {
-                        const progress = charactersSpoken / totalCharacters;
-                        view.scrollToProgress(progress);
+                    // Only scroll after passing the threshold (header + buffer)
+                    if (view && charactersSpoken >= scrollStartThreshold && scrollableCharacters > 0) {
+                        const scrollProgress = (charactersSpoken - scrollStartThreshold) / scrollableCharacters;
+                        view.scrollToProgress(scrollProgress);
                     }
 
                     await this.speakChunk(sentences[i], myGeneration);
@@ -1368,6 +1377,8 @@
                 this.currentSentenceIndex = 0;
                 this.charactersSpoken = 0;
                 this.totalCharacters = 0;
+                this.scrollStartThreshold = 0;
+                this.scrollableCharacters = 0;
             }
 
             get isSpeaking() {
@@ -2226,7 +2237,10 @@
 
                 const fullText = headerText + ' ' + bodyForSpeech + attachmentText;
 
-                await this.speech.speakWithScroll(fullText, this.view);
+                // Delay scrolling until header is read plus ~40 words (~200 chars) into body
+                const scrollStartThreshold = headerText.length + 200;
+
+                await this.speech.speakWithScroll(fullText, this.view, scrollStartThreshold);
             }
 
             async checkForMoreEmails() {
