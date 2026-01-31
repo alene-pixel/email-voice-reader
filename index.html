@@ -2250,7 +2250,7 @@
                     this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
                     this.readCurrentEmail();
                 } catch (e) {
-                    await this.speech.speak('Sorry, I could not mark that email as read.');
+                    await this.speech.speak('Sorry, I could not mark that email as red.');
                 }
             }
 
@@ -2518,7 +2518,7 @@
                     this.view.updateStatus('Opening unsubscribe link...');
                     window.open(match[0], '_blank');
                 } else {
-                    await this.speech.speak('I could not find an unsubscribe link in this email. Marking as read so you can find it later.');
+                    await this.speech.speak('I could not find an unsubscribe link in this email. Marking as red so you can find it later.');
                 }
 
                 await this.gmail.modifyEmail(this.model.currentEmail.id, [], ['UNREAD']);
