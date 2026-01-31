@@ -2246,11 +2246,11 @@
                 this.view.updateStatus('Marking as read...');
                 try {
                     await this.gmail.modifyEmail(this.model.currentEmail.id, [], ['UNREAD']);
-                    await this.speech.speak('Email marked as red.');
+                    await this.speech.speak('Email marked as red.'); // Intentional: "red" not "read" for correct TTS pronunciation
                     this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
                     this.readCurrentEmail();
                 } catch (e) {
-                    await this.speech.speak('Sorry, I could not mark that email as red.');
+                    await this.speech.speak('Sorry, I could not mark that email as red.'); // Intentional: "red" not "read" for correct TTS pronunciation
                 }
             }
 
@@ -2518,11 +2518,11 @@
                     this.view.updateStatus('Opening unsubscribe link...');
                     window.open(match[0], '_blank');
                 } else {
-                    await this.speech.speak('I could not find an unsubscribe link in this email. Marking as red so you can find it later.');
+                    await this.speech.speak('I could not find an unsubscribe link in this email. Marking as red so you can find it later.'); // Intentional: "red" not "read" for correct TTS pronunciation
                 }
 
                 await this.gmail.modifyEmail(this.model.currentEmail.id, [], ['UNREAD']);
-                await this.speech.speak('Marked as red. Moving to next email.');
+                await this.speech.speak('Marked as red. Moving to next email.'); // Intentional: "red" not "read" for correct TTS pronunciation
                 this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
                 this.readCurrentEmail();
             }
