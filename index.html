@@ -194,6 +194,14 @@
             transform: translateY(0);
         }
 
+        /* Temporarily disable hover styles on newly-created buttons (for mobile touch) */
+        .command-button.no-hover:hover {
+            border-color: #C9A7EB;
+            background: white;
+            transform: none;
+            box-shadow: none;
+        }
+
         .command-icon {
             font-size: 22px;
             flex-shrink: 0;
@@ -775,8 +783,11 @@
                 commands.forEach(cmd => {
                     if (cmd.type === 'button') {
                         const button = document.createElement('button');
-                        button.className = 'command-button';
-                        button.onclick = () => cmd.execute();
+                        button.className = 'command-button no-hover'; // Start with no-hover to prevent stuck hover on mobile
+                        button.onclick = () => {
+                            cmd.execute();
+                            button.blur(); // Remove focus/hover state after tap (especially for mobile)
+                        };
                         button.innerHTML = `
                             <span class="command-icon">${cmd.icon}</span>
                             <span class="command-text">
@@ -785,6 +796,8 @@
                             </span>
                         `;
                         this.elements.buttonContainer.appendChild(button);
+                        // Remove no-hover class after a brief delay so hover works normally after touch clears
+                        setTimeout(() => button.classList.remove('no-hover'), 300);
                     } else if (cmd.type === 'header') {
                         const header = document.createElement('div');
                         header.className = 'recent-recipients-header';
@@ -797,7 +810,7 @@
                             <label>✏️ Or type an email address:</label>
                             <div class="forward-input-wrapper">
                                 <input type="email" id="forwardEmailInput" placeholder="someone@example.com" />
-                                <button class="command-button" style="flex-shrink: 0;">
+                                <button class="command-button no-hover" style="flex-shrink: 0;">
                                     <span class="command-icon">✓</span>
                                     <span class="command-text"><strong>Use This</strong></span>
                                 </button>
@@ -808,6 +821,8 @@
                         // Wire up the button and enter key
                         const input = container.querySelector('input');
                         const useButton = container.querySelector('button');
+                        // Remove no-hover class after a brief delay so hover works normally after touch clears
+                        setTimeout(() => useButton.classList.remove('no-hover'), 300);
                         useButton.onclick = () => {
                             const email = input.value.trim();
                             if (email && email.includes('@')) {
@@ -816,6 +831,7 @@
                                 input.style.borderColor = '#FF6B9D';
                                 setTimeout(() => input.style.borderColor = '#FFD6E0', 2000);
                             }
+                            useButton.blur(); // Remove focus/hover state after tap (especially for mobile)
                         };
                         input.onkeypress = (e) => {
                             if (e.key === 'Enter') useButton.click();
