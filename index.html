@@ -1785,7 +1785,7 @@
                     },
                     // Main control commands
                     {
-                        id: 'start', icon: '▶️', label: 'Start Reading Emails',
+                        id: 'start', icon: '▶️', label: 'Play',
                         voiceMatch: (cmd) => cmd.includes('start') || cmd.includes('play') || cmd.includes('begin'),
                         isAvailable: () => m.isAuthenticated && (m.state === 'idle' || m.state === 'reading') && !m.hasEmail,
                         execute: () => this.startReading()
