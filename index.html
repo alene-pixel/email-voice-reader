@@ -194,6 +194,13 @@
             transform: translateY(0);
         }
 
+        .suppress-hover .command-button:hover {
+            border-color: #C9A7EB;
+            background: white;
+            transform: none;
+            box-shadow: none;
+        }
+
         .command-icon {
             font-size: 22px;
             flex-shrink: 0;
@@ -747,6 +754,15 @@
                 this.elements.dictationDisplay.classList.add('hidden');
             }
 
+            resetCommandButtonStates() {
+                const buttons = this.elements.buttonContainer.querySelectorAll('.command-button');
+                buttons.forEach((button) => button.blur());
+                document.body.classList.add('suppress-hover');
+                requestAnimationFrame(() => {
+                    document.body.classList.remove('suppress-hover');
+                });
+            }
+
             getDictationText() {
                 return this.elements.dictationText.innerText.trim();
             }
@@ -776,7 +792,10 @@
                     if (cmd.type === 'button') {
                         const button = document.createElement('button');
                         button.className = 'command-button';
-                        button.onclick = () => cmd.execute();
+                        button.onclick = () => {
+                            this.resetCommandButtonStates();
+                            cmd.execute();
+                        };
                         button.innerHTML = `
                             <span class="command-icon">${cmd.icon}</span>
                             <span class="command-text">
@@ -811,6 +830,7 @@
                         useButton.onclick = () => {
                             const email = input.value.trim();
                             if (email && email.includes('@')) {
+                                this.resetCommandButtonStates();
                                 cmd.onSubmit(email);
                             } else {
                                 input.style.borderColor = '#FF6B9D';
@@ -1827,6 +1847,7 @@
                             label: cmd.label,
                             execute: () => {
                                 this.speech.cancel(); // Stop any ongoing speech immediately
+                                this.view.resetCommandButtonStates();
                                 originalExecute();
                             }
                         });
@@ -1849,6 +1870,7 @@
                             sublabel: name ? email : null,
                             execute: () => {
                                 this.speech.cancel(); // Stop any ongoing speech immediately
+                                this.view.resetCommandButtonStates();
                                 this.resolvePending(recipient);
                             }
                         });
@@ -1858,6 +1880,7 @@
                         type: 'email-input',
                         onSubmit: (email) => {
                             this.speech.cancel(); // Stop any ongoing speech immediately
+                            this.view.resetCommandButtonStates();
                             this.resolvePending(email);
                         }
                     });
@@ -1868,6 +1891,7 @@
                         label: 'Cancel Forward',
                         execute: () => {
                             this.speech.cancel(); // Stop any ongoing speech immediately
+                            this.view.resetCommandButtonStates();
                             this.resolvePending('cancel');
                         }
                     });
