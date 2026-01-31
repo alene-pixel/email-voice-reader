@@ -194,6 +194,16 @@
             transform: translateY(0);
         }
 
+        /* Disable sticky hover on touch devices - :active still provides pressed feedback */
+        @media (hover: none) {
+            .command-button:hover {
+                border-color: #C9A7EB;
+                background: white;
+                transform: none;
+                box-shadow: none;
+            }
+        }
+
         /* Temporarily disable hover styles on newly-created buttons (for mobile touch) */
         .command-button.no-hover:hover {
             border-color: #C9A7EB;
