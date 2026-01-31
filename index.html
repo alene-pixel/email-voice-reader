@@ -850,23 +850,14 @@
                 });
             }
 
-            // Auto-scroll email body during speech
-            startAutoScroll(totalDurationMs) {
+            // Scroll email body to a progress percentage (0 to 1)
+            // Used for sentence-synchronized scrolling
+            scrollToProgress(progress) {
                 const el = this.elements.emailBody;
                 const totalDistance = el.scrollHeight - el.clientHeight;
-                if (totalDistance <= 0) return null;
+                if (totalDistance <= 0) return;
 
-                const intervalMs = 50;
-                const step = totalDistance / (totalDurationMs / intervalMs);
-                let current = 0;
-
-                return setInterval(() => {
-                    current += step;
-                    el.scrollTop = Math.min(current, totalDistance);
-                    if (current >= totalDistance) {
-                        clearInterval(this.scrollInterval);
-                    }
-                }, intervalMs);
+                el.scrollTop = progress * totalDistance;
             }
         }
 
@@ -1127,15 +1118,17 @@
                 this.recognition = null;
                 this.currentUtterance = null;
                 this.onCommand = null; // Callback when voice command is heard
-                this.scrollInterval = null;
-                this.scrollTimeout = null;
                 this.isCancelled = false; // Track cancellation for chunked speech
                 this.speechGeneration = 0; // Increments each time new speech starts, to invalidate old async loops
 
                 // Resume tracking
                 this.remainingSentences = []; // Sentences left to speak when interrupted
-                this.resumeScrollState = null; // Scroll state for resume
                 this.canResume = false; // Whether there's something to resume
+                this.resumeView = null; // View reference for scroll sync on resume
+
+                // Character-based scroll progress tracking
+                this.totalCharacters = 0;
+                this.charactersSpoken = 0;
 
                 this.initRecognition();
             }
@@ -1244,8 +1237,9 @@
                 if (onEnd) onEnd();
             }
 
-            // Speak with auto-scroll timing (uses chunked speech for mobile)
-            async speakWithScroll(text, view, headerWordCount, bodyWordCount, scrollDelayWords) {
+            // Speak with synchronized scrolling (uses chunked speech for mobile)
+            // Scrolls based on character progress through the text
+            async speakWithScroll(text, view) {
                 // Increment generation FIRST to invalidate any old async speech loops
                 this.speechGeneration++;
                 const myGeneration = this.speechGeneration;
@@ -1267,29 +1261,31 @@
                 this.resumeView = view;
                 this.canResume = true;
 
-                // Set up scroll timing on first chunk
-                if (bodyWordCount > 0) {
-                    const wordsPerSecond = 2.5;
-                    const headerDurationMs = (headerWordCount / wordsPerSecond) * 1000;
-                    const scrollDelayDurationMs = (scrollDelayWords / wordsPerSecond) * 1000;
-                    const totalDelayMs = headerDurationMs + scrollDelayDurationMs;
-                    const remainingBodyDurationMs = ((bodyWordCount - scrollDelayWords) / wordsPerSecond) * 1000;
+                // Calculate total characters for progress-based scrolling
+                const totalCharacters = sentences.reduce((sum, s) => sum + s.length, 0);
+                let charactersSpoken = 0;
 
-                    this.scrollTimeout = setTimeout(() => {
-                        // Also check generation for scroll timer
-                        if (!this.isCancelled && myGeneration === this.speechGeneration) {
-                            this.scrollInterval = view.startAutoScroll(remainingBodyDurationMs);
-                        }
-                    }, totalDelayMs);
-                }
+                // Store for resume
+                this.totalCharacters = totalCharacters;
+                this.charactersSpoken = 0;
 
-                // Speak all sentences sequentially
+                // Speak all sentences sequentially with synchronized scrolling
                 for (let i = 0; i < sentences.length; i++) {
                     // Track current position for resume
                     this.currentSentenceIndex = i;
+                    this.charactersSpoken = charactersSpoken;
+
                     // Check both flag and generation
                     if (this.isCancelled || myGeneration !== this.speechGeneration) break;
+
+                    // Scroll to current progress based on characters spoken
+                    if (totalCharacters > 0) {
+                        const progress = charactersSpoken / totalCharacters;
+                        view.scrollToProgress(progress);
+                    }
+
                     await this.speakChunk(sentences[i], myGeneration);
+                    charactersSpoken += sentences[i].length;
                 }
 
                 // If we finished naturally (not cancelled), clear resume state
@@ -1297,20 +1293,10 @@
                     this.canResume = false;
                     this.remainingSentences = [];
                 }
-
-                this.clearScrollTimers();
-            }
-
-            clearScrollTimers() {
-                if (this.scrollInterval) clearInterval(this.scrollInterval);
-                if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
-                this.scrollInterval = null;
-                this.scrollTimeout = null;
             }
 
             cancel() {
                 this.isCancelled = true;
-                this.clearScrollTimers();
 
                 // Save remaining sentences for potential resume
                 if (this.allSentences && this.currentSentenceIndex < this.allSentences.length) {
@@ -1321,7 +1307,7 @@
                 if (this.synthesis) this.synthesis.cancel();
             }
 
-            // Resume speaking from where we left off
+            // Resume speaking from where we left off, with synchronized scrolling
             async resume() {
                 if (!this.canResume || !this.remainingSentences || this.remainingSentences.length === 0) {
                     return false; // Nothing to resume
@@ -1343,11 +1329,26 @@
                 this.allSentences = sentences;
                 this.currentSentenceIndex = 0;
 
-                // Speak remaining sentences sequentially
+                // Continue character count from where we left off
+                let charactersSpoken = this.charactersSpoken || 0;
+                const totalCharacters = this.totalCharacters || 1;
+                const view = this.resumeView;
+
+                // Speak remaining sentences sequentially with synchronized scrolling
                 for (let i = 0; i < sentences.length; i++) {
                     this.currentSentenceIndex = i;
+                    this.charactersSpoken = charactersSpoken;
+
                     if (this.isCancelled || myGeneration !== this.speechGeneration) break;
+
+                    // Scroll to current progress based on characters spoken
+                    if (view && totalCharacters > 0) {
+                        const progress = charactersSpoken / totalCharacters;
+                        view.scrollToProgress(progress);
+                    }
+
                     await this.speakChunk(sentences[i], myGeneration);
+                    charactersSpoken += sentences[i].length;
                 }
 
                 // If we finished naturally, clear resume state
@@ -1365,6 +1366,8 @@
                 this.remainingSentences = [];
                 this.allSentences = null;
                 this.currentSentenceIndex = 0;
+                this.charactersSpoken = 0;
+                this.totalCharacters = 0;
             }
 
             get isSpeaking() {
@@ -2222,10 +2225,8 @@
                 }
 
                 const fullText = headerText + ' ' + bodyForSpeech + attachmentText;
-                const headerWords = headerText.split(/\s+/).length;
-                const bodyWords = bodyForSpeech.split(/\s+/).length;
 
-                await this.speech.speakWithScroll(fullText, this.view, headerWords, bodyWords, 40);
+                await this.speech.speakWithScroll(fullText, this.view);
             }
 
             async checkForMoreEmails() {
