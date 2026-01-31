@@ -776,10 +776,7 @@
                     if (cmd.type === 'button') {
                         const button = document.createElement('button');
                         button.className = 'command-button';
-                        button.onclick = () => {
-                            cmd.execute();
-                            button.blur(); // Remove focus/hover state after tap (especially for mobile)
-                        };
+                        button.onclick = () => cmd.execute();
                         button.innerHTML = `
                             <span class="command-icon">${cmd.icon}</span>
                             <span class="command-text">
@@ -819,7 +816,6 @@
                                 input.style.borderColor = '#FF6B9D';
                                 setTimeout(() => input.style.borderColor = '#FFD6E0', 2000);
                             }
-                            useButton.blur(); // Remove focus/hover state after tap (especially for mobile)
                         };
                         input.onkeypress = (e) => {
                             if (e.key === 'Enter') useButton.click();
