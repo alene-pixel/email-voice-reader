@@ -1528,15 +1528,41 @@
                     const data = await response.json();
                     if (!data.messages) return null;
 
-                    const msgResponse = await this.fetchWithAuth(
-                        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${data.messages[0].id}?format=full`
-                    );
-                    const message = await msgResponse.json();
+                    // Prepare spoken words for matching
+                    const spokenWords = name.toLowerCase().split(/\s+/).filter(w => w.length > 1);
 
-                    const to = EmailUtils.getHeader(message, 'To');
-                    const from = EmailUtils.getHeader(message, 'From');
-                    const match = (to + ' ' + from).match(/[\w\.-]+@[\w\.-]+\.\w+/);
-                    return match ? match[0] : null;
+                    // Check multiple messages to find one that actually matches the query
+                    for (const msg of data.messages) {
+                        const msgResponse = await this.fetchWithAuth(
+                            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=To&metadataHeaders=From&metadataHeaders=Cc`
+                        );
+                        const message = await msgResponse.json();
+
+                        const to = EmailUtils.getHeader(message, 'To') || '';
+                        const from = EmailUtils.getHeader(message, 'From') || '';
+                        const cc = EmailUtils.getHeader(message, 'Cc') || '';
+                        const allAddresses = to + ' ' + from + ' ' + cc;
+
+                        // Extract all email addresses with their display names
+                        const addressPattern = /(?:([^<,]+)\s*)?<?([\w\.-]+@[\w\.-]+\.\w+)>?/g;
+                        let addrMatch;
+                        while ((addrMatch = addressPattern.exec(allAddresses)) !== null) {
+                            const displayName = (addrMatch[1] || '').trim();
+                            const email = addrMatch[2];
+                            const emailUsername = email.split('@')[0].replace(/[._]/g, ' ');
+                            const searchText = (displayName + ' ' + emailUsername).toLowerCase();
+
+                            // Check if any spoken word matches this address
+                            for (const word of spokenWords) {
+                                if (searchText.includes(word)) {
+                                    return email; // Found a validated match!
+                                }
+                            }
+                        }
+                    }
+
+                    // No validated match found in any of the results
+                    return null;
                 } catch (e) {
                     return null;
                 }
@@ -1967,14 +1993,62 @@
                 this.speech.speak('I did not understand that command. Please try again.');
             }
 
+            // Match spoken words against a list of recipients
+            // Returns the best matching recipient or null
+            findMatchingRecipient(spokenName, recipients) {
+                if (!recipients || !recipients.length) return null;
+
+                const spokenWords = spokenName.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+                if (!spokenWords.length) return null;
+
+                let bestMatch = null;
+                let bestScore = 0;
+
+                for (const recipient of recipients) {
+                    // Parse "Name <email>" format
+                    const angleMatch = recipient.match(/<([^>]+)>/);
+                    const email = angleMatch ? angleMatch[1] : recipient;
+                    const displayName = angleMatch ? recipient.replace(/<[^>]+>/, '').trim() : '';
+
+                    // Get searchable text (name + email username)
+                    const emailUsername = email.split('@')[0].replace(/[._]/g, ' ');
+                    const searchText = (displayName + ' ' + emailUsername).toLowerCase();
+
+                    // Score: how many spoken words appear in the recipient?
+                    let score = 0;
+                    for (const word of spokenWords) {
+                        if (searchText.includes(word)) {
+                            score++;
+                        }
+                    }
+
+                    // Require at least one word to match
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMatch = recipient;
+                    }
+                }
+
+                return bestMatch;
+            }
+
             async searchAndSelectRecipient(spokenName) {
+                // First, try to match against displayed recipients (fast and reliable)
+                const localMatch = this.findMatchingRecipient(spokenName, this.model.recentRecipients);
+                if (localMatch) {
+                    this.view.updateStatus('Found match', spokenName);
+                    this.resolvePending(localMatch);
+                    return;
+                }
+
+                // Fall back to Gmail search with validation
                 this.view.updateStatus('Searching...', `Looking for ${spokenName}`);
                 const foundEmail = await this.gmail.searchForEmail(spokenName);
 
                 if (foundEmail) {
                     this.resolvePending(foundEmail);
                 } else {
-                    this.speech.speak(`I could not find an email for ${spokenName}. Please try again, click a recent recipient, or type the email address.`);
+                    this.speech.speak(`I could not find anyone matching ${spokenName}. Please try again, click a recent recipient, or type the email address.`);
                     this.view.updateStatus('Choose recipient');
                 }
             }
