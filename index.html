@@ -349,6 +349,13 @@
             box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.25);
         }
 
+        .recent-recipients-header {
+            grid-column: 1 / -1;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
         .attachments-display {
             border-radius: 12px;
             padding: 5px 0px;
@@ -818,7 +825,11 @@
                         this.elements.buttonContainer.appendChild(button);
                         // Remove no-hover class after a brief delay so hover works normally after touch clears
                         setTimeout(() => button.classList.remove('no-hover'), 300);
-                    } 
+                    } else if (cmd.type === 'header') {
+                        const header = document.createElement('div');
+                        header.className = 'recent-recipients-header';
+                        header.textContent = cmd.text;
+                        this.elements.buttonContainer.appendChild(header);
                     } else if (cmd.type === 'email-input') {
                         const container = document.createElement('div');
                         container.className = 'forward-input-container';
@@ -1881,6 +1892,7 @@
 
                 // Special case: forward recipient selection
                 if (m.state === 'confirming-forward-recipient' && m.recentRecipients) {
+                    commands.push({ type: 'header', text: '📬 Recent Recipients (click to select):' });
 
                     for (const recipient of m.recentRecipients) {
                         const match = recipient.match(/<([^>]+)>/);
