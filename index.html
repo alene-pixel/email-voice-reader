@@ -339,7 +339,7 @@
             flex: 1;
             min-width: 0;
             padding: 10px;
-            border: 2px solid #FFD6E0;
+            border: 2px solid #C9A7EB;
             border-radius: 8px;
             font-size: 11px;
         }
@@ -1804,7 +1804,7 @@
                     {
                         id: 'stop', icon: '⏹️', label: 'Stop',
                         voiceMatch: (cmd) => cmd.includes('stop') || cmd.includes('pause') || cmd.includes('wait') || cmd.includes('hold on'),
-                        isAvailable: () => m.state === 'reading' && m.hasEmail,
+                        isAvailable: () => ['reading', 'reading-attachment'].includes(m.state) && m.hasEmail,
                         execute: () => this.stopReading()
                     },
                     {
@@ -2588,9 +2588,17 @@
                     return;
                 }
 
+                // Set state so Stop button appears and Read Attachments button hides
+                this.model.setState('reading-attachment');
                 this.view.updateStatus('Reading attachments...');
 
                 for (let i = 0; i < readableAttachments.length; i++) {
+                    // Check if user said "Stop" (state would change from 'reading-attachment')
+                    if (this.model.state !== 'reading-attachment') {
+                        this.view.updateStatus('Stopped reading attachments');
+                        return;
+                    }
+
                     const attachment = readableAttachments[i];
                     const position = readableAttachments.length > 1 ? `Attachment ${i + 1} of ${readableAttachments.length}. ` : '';
 
@@ -2601,6 +2609,12 @@
                         this.model.currentEmail.id,
                         attachment
                     );
+
+                    // Check again after extraction in case user said "Stop" during the wait
+                    if (this.model.state !== 'reading-attachment') {
+                        this.view.updateStatus('Stopped reading attachments');
+                        return;
+                    }
 
                     if (result.success) {
                         const textToRead = result.text;
