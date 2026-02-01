@@ -1918,16 +1918,6 @@
                             this.resolvePending(email);
                         }
                     });
-
-                    commands.push({
-                        type: 'button',
-                        icon: '✗',
-                        label: 'Cancel Forward',
-                        execute: () => {
-                            this.speech.cancel(); // Stop any ongoing speech immediately
-                            this.resolvePending('cancel');
-                        }
-                    });
                 }
 
                 // Store commands for voice matching
