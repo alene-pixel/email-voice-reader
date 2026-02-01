@@ -1921,7 +1921,7 @@
                             type: 'button',
                             icon: '👤',
                             label: name || email,
-                            sublabel: name ? email : null,
+                            sublabel: email,
                             execute: () => {
                                 this.speech.cancel(); // Stop any ongoing speech immediately
                                 this.resolvePending(recipient);
