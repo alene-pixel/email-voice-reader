@@ -1155,7 +1155,7 @@
                     this.recognition.lang = 'en-US';
 
                     this.recognition.onresult = (event) => {
-                        const command = event.results[0][0].transcript.toLowerCase().trim();
+                        const command = event.results[0][0].transcript.trim();
                         console.log('Heard:', command);
                         this.cancel(); // Stop any ongoing speech
                         if (this.onCommand) this.onCommand(command);
@@ -1940,7 +1940,7 @@
 
                 // Special handling for forward recipient voice search
                 if (this.model.state === 'confirming-forward-recipient') {
-                    if (spokenCommand.includes('cancel')) {
+                    if (spokenCommand.toLowerCase().includes('cancel')) {
                         this.resolvePending('cancel');
                         return;
                     }
@@ -1949,9 +1949,10 @@
                     return;
                 }
 
-                // Find matching command from available commands
+                // Find matching command from available commands (use lowercase for case-insensitive matching)
+                const spokenLower = spokenCommand.toLowerCase();
                 for (const cmd of this.currentCommands || []) {
-                    if (cmd.voiceMatch && cmd.voiceMatch(spokenCommand)) {
+                    if (cmd.voiceMatch && cmd.voiceMatch(spokenLower)) {
                         cmd.execute();
                         return;
                     }
