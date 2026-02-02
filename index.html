@@ -1170,19 +1170,6 @@
                         setTimeout(() => this.startListening(), 100);
                     };
                 }
-<<<<<<< HEAD
-
-                // Backup: When screen turns back on, try to restart voice listening
-                // This helps recover if listening stopped while the screen was off
-                document.addEventListener('visibilitychange', () => {
-                    if (!document.hidden && this.recognition) {
-                        console.log('Screen turned on - ensuring voice listening is active');
-                        // Small delay, then try to start (will safely fail if already running)
-                        setTimeout(() => this.startListening(), 500);
-                    }
-                });
-=======
->>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
             }
 
             startListening() {
@@ -1198,58 +1185,6 @@
                 return false;
             }
 
-<<<<<<< HEAD
-            // Wake lock keeps the screen on while the app is reading
-            async acquireWakeLock() {
-                // Clear any pending release timer since we're speaking again
-                if (this.wakeLockTimer) {
-                    clearTimeout(this.wakeLockTimer);
-                    this.wakeLockTimer = null;
-                }
-
-                // Only acquire if we don't already have one
-                if (this.wakeLock) return;
-
-                try {
-                    if ('wakeLock' in navigator) {
-                        this.wakeLock = await navigator.wakeLock.request('screen');
-                        console.log('Wake lock acquired - screen will stay on');
-
-                        // Handle wake lock being released by the system
-                        this.wakeLock.addEventListener('release', () => {
-                            console.log('Wake lock released by system');
-                            this.wakeLock = null;
-                        });
-                    }
-                } catch (e) {
-                    // Wake lock not supported or failed - that's ok, not critical
-                    console.log('Wake lock not available:', e.message);
-                }
-            }
-
-            releaseWakeLockAfterDelay() {
-                // Clear any existing timer
-                if (this.wakeLockTimer) {
-                    clearTimeout(this.wakeLockTimer);
-                }
-
-                // Release wake lock after delay (gives user time to respond)
-                this.wakeLockTimer = setTimeout(async () => {
-                    if (this.wakeLock) {
-                        try {
-                            await this.wakeLock.release();
-                            console.log('Wake lock released - screen can turn off now');
-                        } catch (e) {
-                            // Already released or error - that's ok
-                        }
-                        this.wakeLock = null;
-                    }
-                    this.wakeLockTimer = null;
-                }, this.wakeLockDelay);
-            }
-
-=======
->>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
             // Split text into sentences for mobile compatibility
             // Mobile browsers cut off long utterances, so we chunk by sentence
             splitIntoSentences(text) {
@@ -1293,12 +1228,6 @@
                 this.speechGeneration++;
                 const myGeneration = this.speechGeneration;
 
-<<<<<<< HEAD
-                // Keep screen on while speaking
-                this.acquireWakeLock();
-
-=======
->>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
                 if (this.synthesis.paused) this.synthesis.resume();
                 this.synthesis.cancel();
                 // Keep isCancelled true during delay so old loops can see it and exit
@@ -1319,12 +1248,6 @@
                 }
 
                 if (onEnd) onEnd();
-<<<<<<< HEAD
-
-                // Allow screen to turn off after a delay (gives user time to respond)
-                this.releaseWakeLockAfterDelay();
-=======
->>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
             }
 
             // Speak with synchronized scrolling (uses chunked speech for mobile)
@@ -1335,12 +1258,6 @@
                 this.speechGeneration++;
                 const myGeneration = this.speechGeneration;
 
-<<<<<<< HEAD
-                // Keep screen on while speaking
-                this.acquireWakeLock();
-
-=======
->>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
                 if (this.synthesis.paused) this.synthesis.resume();
                 this.synthesis.cancel();
                 // Keep isCancelled true during delay so old loops can see it and exit
@@ -1395,12 +1312,6 @@
                     this.canResume = false;
                     this.remainingSentences = [];
                 }
-<<<<<<< HEAD
-
-                // Allow screen to turn off after a delay (gives user time to respond)
-                this.releaseWakeLockAfterDelay();
-=======
->>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
             }
 
             cancel() {
@@ -1425,12 +1336,6 @@
                 this.speechGeneration++;
                 const myGeneration = this.speechGeneration;
 
-<<<<<<< HEAD
-                // Keep screen on while speaking
-                this.acquireWakeLock();
-
-=======
->>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
                 if (this.synthesis.paused) this.synthesis.resume();
                 this.synthesis.cancel();
 
@@ -1472,12 +1377,6 @@
                     this.remainingSentences = [];
                 }
 
-<<<<<<< HEAD
-                // Allow screen to turn off after a delay (gives user time to respond)
-                this.releaseWakeLockAfterDelay();
-
-=======
->>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
                 return true;
             }
 
@@ -1911,7 +1810,7 @@
                     },
                     {
                         id: 'spam', icon: '⚠️', label: 'Spam',
-                        voiceMatch: (cmd) => cmd.includes('spam')|| cmd.includes('mark as spam'),
+                        voiceMatch: (cmd) => cmd.includes('spam'),
                         isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
                         execute: () => this.markAsSpam()
                     },
