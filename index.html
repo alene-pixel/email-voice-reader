@@ -1143,6 +1143,11 @@
                 this.scrollStartThreshold = 0; // Don't scroll until this many chars spoken
                 this.scrollableCharacters = 0; // Chars after threshold that map to scroll
 
+                // Wake lock to keep screen on while speaking
+                this.wakeLock = null;
+                this.wakeLockTimer = null;
+                this.wakeLockDelay = 15000; // Keep screen on for 15 seconds after speech ends
+
                 this.initRecognition();
             }
 
@@ -1170,6 +1175,16 @@
                         setTimeout(() => this.startListening(), 100);
                     };
                 }
+
+                // Backup: When screen turns back on, try to restart voice listening
+                // This helps recover if listening stopped while the screen was off
+                document.addEventListener('visibilitychange', () => {
+                    if (!document.hidden && this.recognition) {
+                        console.log('Screen turned on - ensuring voice listening is active');
+                        // Small delay, then try to start (will safely fail if already running)
+                        setTimeout(() => this.startListening(), 500);
+                    }
+                });
             }
 
             startListening() {
@@ -1183,6 +1198,55 @@
                     }
                 }
                 return false;
+            }
+
+            // Wake lock keeps the screen on while the app is reading
+            async acquireWakeLock() {
+                // Clear any pending release timer since we're speaking again
+                if (this.wakeLockTimer) {
+                    clearTimeout(this.wakeLockTimer);
+                    this.wakeLockTimer = null;
+                }
+
+                // Only acquire if we don't already have one
+                if (this.wakeLock) return;
+
+                try {
+                    if ('wakeLock' in navigator) {
+                        this.wakeLock = await navigator.wakeLock.request('screen');
+                        console.log('Wake lock acquired - screen will stay on');
+
+                        // Handle wake lock being released by the system
+                        this.wakeLock.addEventListener('release', () => {
+                            console.log('Wake lock released by system');
+                            this.wakeLock = null;
+                        });
+                    }
+                } catch (e) {
+                    // Wake lock not supported or failed - that's ok, not critical
+                    console.log('Wake lock not available:', e.message);
+                }
+            }
+
+            releaseWakeLockAfterDelay() {
+                // Clear any existing timer
+                if (this.wakeLockTimer) {
+                    clearTimeout(this.wakeLockTimer);
+                }
+
+                // Release wake lock after delay (gives user time to respond)
+                this.wakeLockTimer = setTimeout(async () => {
+                    if (this.wakeLock) {
+                        try {
+                            await this.wakeLock.release();
+                            console.log('Wake lock released - screen can turn off now');
+                        } catch (e) {
+                            // Already released or error - that's ok
+                        }
+                        this.wakeLock = null;
+                    }
+                    this.wakeLockTimer = null;
+                }, this.wakeLockDelay);
             }
 
             // Split text into sentences for mobile compatibility
@@ -1228,6 +1292,9 @@
                 this.speechGeneration++;
                 const myGeneration = this.speechGeneration;
 
+                // Keep screen on while speaking
+                this.acquireWakeLock();
+
                 if (this.synthesis.paused) this.synthesis.resume();
                 this.synthesis.cancel();
                 // Keep isCancelled true during delay so old loops can see it and exit
@@ -1248,6 +1315,9 @@
                 }
 
                 if (onEnd) onEnd();
+
+                // Allow screen to turn off after a delay (gives user time to respond)
+                this.releaseWakeLockAfterDelay();
             }
 
             // Speak with synchronized scrolling (uses chunked speech for mobile)
@@ -1257,6 +1327,9 @@
                 // Increment generation FIRST to invalidate any old async speech loops
                 this.speechGeneration++;
                 const myGeneration = this.speechGeneration;
+
+                // Keep screen on while speaking
+                this.acquireWakeLock();
 
                 if (this.synthesis.paused) this.synthesis.resume();
                 this.synthesis.cancel();
@@ -1312,6 +1385,9 @@
                     this.canResume = false;
                     this.remainingSentences = [];
                 }
+
+                // Allow screen to turn off after a delay (gives user time to respond)
+                this.releaseWakeLockAfterDelay();
             }
 
             cancel() {
@@ -1335,6 +1411,9 @@
                 // Increment generation to invalidate any old loops
                 this.speechGeneration++;
                 const myGeneration = this.speechGeneration;
+
+                // Keep screen on while speaking
+                this.acquireWakeLock();
 
                 if (this.synthesis.paused) this.synthesis.resume();
                 this.synthesis.cancel();
@@ -1376,6 +1455,9 @@
                     this.canResume = false;
                     this.remainingSentences = [];
                 }
+
+                // Allow screen to turn off after a delay (gives user time to respond)
+                this.releaseWakeLockAfterDelay();
 
                 return true;
             }
