@@ -1143,11 +1143,6 @@
                 this.scrollStartThreshold = 0; // Don't scroll until this many chars spoken
                 this.scrollableCharacters = 0; // Chars after threshold that map to scroll
 
-                // Wake lock to keep screen on while speaking
-                this.wakeLock = null;
-                this.wakeLockTimer = null;
-                this.wakeLockDelay = 15000; // Keep screen on for 15 seconds after speech ends
-
                 this.initRecognition();
             }
 
@@ -1175,6 +1170,7 @@
                         setTimeout(() => this.startListening(), 100);
                     };
                 }
+<<<<<<< HEAD
 
                 // Backup: When screen turns back on, try to restart voice listening
                 // This helps recover if listening stopped while the screen was off
@@ -1185,6 +1181,8 @@
                         setTimeout(() => this.startListening(), 500);
                     }
                 });
+=======
+>>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
             }
 
             startListening() {
@@ -1200,6 +1198,7 @@
                 return false;
             }
 
+<<<<<<< HEAD
             // Wake lock keeps the screen on while the app is reading
             async acquireWakeLock() {
                 // Clear any pending release timer since we're speaking again
@@ -1249,6 +1248,8 @@
                 }, this.wakeLockDelay);
             }
 
+=======
+>>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
             // Split text into sentences for mobile compatibility
             // Mobile browsers cut off long utterances, so we chunk by sentence
             splitIntoSentences(text) {
@@ -1292,9 +1293,12 @@
                 this.speechGeneration++;
                 const myGeneration = this.speechGeneration;
 
+<<<<<<< HEAD
                 // Keep screen on while speaking
                 this.acquireWakeLock();
 
+=======
+>>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
                 if (this.synthesis.paused) this.synthesis.resume();
                 this.synthesis.cancel();
                 // Keep isCancelled true during delay so old loops can see it and exit
@@ -1315,9 +1319,12 @@
                 }
 
                 if (onEnd) onEnd();
+<<<<<<< HEAD
 
                 // Allow screen to turn off after a delay (gives user time to respond)
                 this.releaseWakeLockAfterDelay();
+=======
+>>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
             }
 
             // Speak with synchronized scrolling (uses chunked speech for mobile)
@@ -1328,9 +1335,12 @@
                 this.speechGeneration++;
                 const myGeneration = this.speechGeneration;
 
+<<<<<<< HEAD
                 // Keep screen on while speaking
                 this.acquireWakeLock();
 
+=======
+>>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
                 if (this.synthesis.paused) this.synthesis.resume();
                 this.synthesis.cancel();
                 // Keep isCancelled true during delay so old loops can see it and exit
@@ -1385,9 +1395,12 @@
                     this.canResume = false;
                     this.remainingSentences = [];
                 }
+<<<<<<< HEAD
 
                 // Allow screen to turn off after a delay (gives user time to respond)
                 this.releaseWakeLockAfterDelay();
+=======
+>>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
             }
 
             cancel() {
@@ -1412,9 +1425,12 @@
                 this.speechGeneration++;
                 const myGeneration = this.speechGeneration;
 
+<<<<<<< HEAD
                 // Keep screen on while speaking
                 this.acquireWakeLock();
 
+=======
+>>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
                 if (this.synthesis.paused) this.synthesis.resume();
                 this.synthesis.cancel();
 
@@ -1456,9 +1472,12 @@
                     this.remainingSentences = [];
                 }
 
+<<<<<<< HEAD
                 // Allow screen to turn off after a delay (gives user time to respond)
                 this.releaseWakeLockAfterDelay();
 
+=======
+>>>>>>> 52d6de1b8c469b5f0677941850955aa5d2bf257d
                 return true;
             }
 
