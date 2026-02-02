@@ -1152,10 +1152,6 @@
             }
 
             initRecognition() {
-                // Track if page is visible - don't restart recognition when hidden
-                this.isPageVisible = !document.hidden;
-                this.recognitionEnabled = false; // Set to true when user activates app
-
                 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
                     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                     this.recognition = new SpeechRecognition();
@@ -1172,59 +1168,41 @@
 
                     this.recognition.onerror = (event) => {
                         console.error('Speech recognition error:', event.error);
-                        // Don't restart on 'aborted' - this happens when page goes to background
-                        // The visibility change handler will restart when page becomes visible
-                        if (event.error === 'aborted' || event.error === 'not-allowed') {
-                            return;
-                        }
-                        // For other errors (no-speech, network, etc.), onend will trigger restart
                     };
 
                     this.recognition.onend = () => {
-                        // Only restart if page is visible and recognition is enabled
-                        if (this.isPageVisible && this.recognitionEnabled) {
-                            setTimeout(() => this.startListening(), 100);
-                        }
+                        // Always restart listening
+                        setTimeout(() => this.startListening(), 100);
                     };
                 }
 
-                // Listen for page visibility changes (screen on/off, tab switch)
+                // Backup: When screen turns back on, try to restart voice listening
+                // This helps recover if listening stopped while the screen was off
                 document.addEventListener('visibilitychange', () => {
-                    this.isPageVisible = !document.hidden;
-                    console.log('Page visibility changed:', this.isPageVisible ? 'visible' : 'hidden');
-
-                    if (this.isPageVisible && this.recognitionEnabled) {
-                        // Page became visible - restart voice recognition
-                        console.log('Restarting voice recognition after visibility change');
-                        setTimeout(() => this.startListening(), 300);
-
-                        // Re-acquire wake lock if we're still speaking or have a pending timer
-                        if (this.synthesis.speaking || this.wakeLockTimer) {
-                            this.acquireWakeLock();
-                        }
+                    if (!document.hidden && this.recognition) {
+                        console.log('Screen turned on - ensuring voice listening is active');
+                        // Small delay, then try to start (will safely fail if already running)
+                        setTimeout(() => this.startListening(), 500);
                     }
                 });
             }
 
             startListening() {
-                // Mark recognition as enabled so it will auto-restart
-                this.recognitionEnabled = true;
-
                 if (this.recognition) {
                     try {
                         this.recognition.start();
                         return true;
                     } catch (e) {
-                        // Already started or other error - that's ok
+                        // Already started
                         return false;
                     }
                 }
                 return false;
             }
 
-            // Wake lock methods to keep screen on while speaking
+            // Wake lock keeps the screen on while the app is reading
             async acquireWakeLock() {
-                // Clear any pending release timer
+                // Clear any pending release timer since we're speaking again
                 if (this.wakeLockTimer) {
                     clearTimeout(this.wakeLockTimer);
                     this.wakeLockTimer = null;
@@ -1245,6 +1223,7 @@
                         });
                     }
                 } catch (e) {
+                    // Wake lock not supported or failed - that's ok, not critical
                     console.log('Wake lock not available:', e.message);
                 }
             }
@@ -1255,14 +1234,14 @@
                     clearTimeout(this.wakeLockTimer);
                 }
 
-                // Set timer to release wake lock after delay
+                // Release wake lock after delay (gives user time to respond)
                 this.wakeLockTimer = setTimeout(async () => {
                     if (this.wakeLock) {
                         try {
                             await this.wakeLock.release();
-                            console.log('Wake lock released after delay');
+                            console.log('Wake lock released - screen can turn off now');
                         } catch (e) {
-                            console.log('Error releasing wake lock:', e.message);
+                            // Already released or error - that's ok
                         }
                         this.wakeLock = null;
                     }
@@ -1314,7 +1293,7 @@
                 const myGeneration = this.speechGeneration;
 
                 // Keep screen on while speaking
-                await this.acquireWakeLock();
+                this.acquireWakeLock();
 
                 if (this.synthesis.paused) this.synthesis.resume();
                 this.synthesis.cancel();
@@ -1337,7 +1316,7 @@
 
                 if (onEnd) onEnd();
 
-                // Release wake lock after delay (gives user time to respond)
+                // Allow screen to turn off after a delay (gives user time to respond)
                 this.releaseWakeLockAfterDelay();
             }
 
@@ -1350,7 +1329,7 @@
                 const myGeneration = this.speechGeneration;
 
                 // Keep screen on while speaking
-                await this.acquireWakeLock();
+                this.acquireWakeLock();
 
                 if (this.synthesis.paused) this.synthesis.resume();
                 this.synthesis.cancel();
@@ -1407,7 +1386,7 @@
                     this.remainingSentences = [];
                 }
 
-                // Release wake lock after delay (gives user time to respond)
+                // Allow screen to turn off after a delay (gives user time to respond)
                 this.releaseWakeLockAfterDelay();
             }
 
@@ -1434,7 +1413,7 @@
                 const myGeneration = this.speechGeneration;
 
                 // Keep screen on while speaking
-                await this.acquireWakeLock();
+                this.acquireWakeLock();
 
                 if (this.synthesis.paused) this.synthesis.resume();
                 this.synthesis.cancel();
@@ -1477,7 +1456,7 @@
                     this.remainingSentences = [];
                 }
 
-                // Release wake lock after delay (gives user time to respond)
+                // Allow screen to turn off after a delay (gives user time to respond)
                 this.releaseWakeLockAfterDelay();
 
                 return true;
