@@ -922,8 +922,8 @@
 
                             const findParts = (parts) => {
                                 for (let part of parts) {
-                                    if (part.mimeType === 'text/plain' && part.body?.data) plainPart = part;
-                                    if (part.mimeType === 'text/html' && part.body?.data) htmlPart = part;
+                                    if (part.mimeType === 'text/plain' && part.body?.data && !plainPart) plainPart = part;
+                                    if (part.mimeType === 'text/html' && part.body?.data && !htmlPart) htmlPart = part;
                                     if (part.parts) findParts(part.parts);
                                 }
                             };
@@ -1582,6 +1582,14 @@
                                 (to + ',' + cc).split(',')
                                     .map(addr => addr.trim())
                                     .filter(addr => addr && !addr.toLowerCase().includes(myEmail.toLowerCase()))
+                                    .filter(addr => {
+                                        // Skip unsubscribe emails
+                                        const emailMatch = addr.match(/<([^>]+)>/);
+                                        const emailAddr = (emailMatch ? emailMatch[1] : addr).toLowerCase();
+                                        if (emailAddr.includes('unsubscribe')) return false;
+                                        if (emailAddr.startsWith('unsub')) return false;
+                                        return true;
+                                    })
                                     .forEach(addr => {
                                         if (recipients.size < maxResults) {
                                             const match = addr.match(/<([^>]+)>/);
