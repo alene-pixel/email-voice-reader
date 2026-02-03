@@ -1959,13 +1959,13 @@
                         execute: () => this.resolvePending('no')
                     },
                     {
-                        id: 'reply-sender', icon: '👤', label: 'Reply to Sender Only',
-                        voiceMatch: (cmd) => cmd.includes('reply') && !cmd.includes('all'),
+                        id: 'reply-sender', icon: '👤', label: 'Sender Only',
+                        voiceMatch: (cmd) => cmd.includes('reply') && !cmd.includes('all') || cmd.includes('sender only') || cmd.includes('only sender'),
                         isAvailable: () => m.state === 'confirming-reply-type',
                         execute: () => this.resolvePending('reply')
                     },
                     {
-                        id: 'reply-all', icon: '👥', label: 'Reply All',
+                        id: 'reply-all', icon: '👥', label: 'All',
                         voiceMatch: (cmd) => cmd.includes('all'),
                         isAvailable: () => m.state === 'confirming-reply-type',
                         execute: () => this.resolvePending('reply all')
