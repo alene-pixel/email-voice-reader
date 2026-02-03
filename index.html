@@ -319,6 +319,13 @@
             margin-top: 15px;
         }
 
+        /* Single column for recipient buttons on mobile */
+        @media (max-width: 500px) {
+            .recipient-button {
+                grid-column: 1 / -1;
+            }
+        }
+
         .forward-input-container {
             grid-column: 1 / -1;
         }
@@ -809,7 +816,7 @@
                 commands.forEach(cmd => {
                     if (cmd.type === 'button') {
                         const button = document.createElement('button');
-                        button.className = 'command-button no-hover'; // Start with no-hover to prevent stuck hover on mobile
+                        button.className = 'command-button no-hover' + (cmd.isRecipient ? ' recipient-button' : ''); // Start with no-hover to prevent stuck hover on mobile
                         button.onclick = () => {
                             cmd.execute();
                             button.blur(); // Remove focus/hover state after tap (especially for mobile)
@@ -2012,6 +2019,7 @@
                             icon: '👤',
                             label: name || email,
                             sublabel: email,
+                            isRecipient: true,
                             execute: () => {
                                 this.speech.cancel(); // Stop any ongoing speech immediately
                                 this.resolvePending(recipient);
