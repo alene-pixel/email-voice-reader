@@ -1900,7 +1900,7 @@
                     },
                     {
                         id: 'spam', icon: '⚠️', label: 'Spam',
-                        voiceMatch: (cmd) => cmd.includes('spam'),
+                        voiceMatch: (cmd) => cmd.includes('spam') || cmd.includes('mark as spam') || cmd.includes('mark spam'),
                         isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
                         execute: () => this.markAsSpam()
                     },
