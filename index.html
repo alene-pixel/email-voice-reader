@@ -2594,6 +2594,14 @@
                         }
                     }
 
+                    // Get original email info for quoting
+                    const origDate = EmailUtils.getHeader(email, 'Date') || '';
+                    const origBody = EmailUtils.getEmailBody(email);
+
+                    // Format the quoted original message
+                    const quotedLines = origBody.split('\n').map(line => '> ' + line).join('\n');
+                    const quoteHeader = `On ${origDate}, ${from} wrote:`;
+
                     const emailLines = [`To: ${toRecipients}`];
                     if (ccRecipients) emailLines.push(`Cc: ${ccRecipients}`);
                     emailLines.push(
@@ -2601,7 +2609,10 @@
                         `In-Reply-To: ${messageId}`,
                         `References: ${references}`,
                         '',
-                        text
+                        text,
+                        '',
+                        quoteHeader,
+                        quotedLines
                     );
 
                     await this.gmail.sendEmail(emailLines.join('\n'), email.threadId);
