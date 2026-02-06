@@ -1173,13 +1173,6 @@
                         if (this.onCommand) this.onCommand(command);
                     };
 
-                    // Stop reading IMMEDIATELY when user starts speaking
-                    // This makes voice commands feel as responsive as button presses
-                    this.recognition.onspeechstart = () => {
-                        console.log('Speech detected - stopping reading immediately');
-                        this.cancel();
-                    };
-
                     this.recognition.onerror = (event) => {
                         console.error('Speech recognition error:', event.error);
                     };
