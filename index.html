@@ -2595,10 +2595,11 @@
                     const quotedLines = origBody.split('\n').map(line => '> ' + line).join('\n');
                     const quoteHeader = `On ${origDate}, ${from} wrote:`;
 
+                    const replySubject = EmailUtils.encodeHeaderValue('Re: ' + subject);
                     const emailLines = [`To: ${toRecipients}`];
                     if (ccRecipients) emailLines.push(`Cc: ${ccRecipients}`);
                     emailLines.push(
-                        `Subject: Re: ${subject}`,
+                        `Subject: ${replySubject}`,
                         `In-Reply-To: ${messageId}`,
                         `References: ${references}`,
                         '',
