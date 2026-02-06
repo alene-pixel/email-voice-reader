@@ -2706,9 +2706,10 @@
                     const subject = EmailUtils.getHeader(email, 'Subject');
                     const body = EmailUtils.getEmailBody(email);
 
+                    const fwdSubject = EmailUtils.encodeHeaderValue('Fwd: ' + subject);
                     const emailParts = [
                         `To: ${toAddress}`,
-                        `Subject: Fwd: ${subject}`,
+                        `Subject: ${fwdSubject}`,
                         ''
                     ];
 
