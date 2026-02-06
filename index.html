@@ -1173,13 +1173,6 @@
                         if (this.onCommand) this.onCommand(command);
                     };
 
-                    // Stop reading IMMEDIATELY when user starts speaking
-                    // This makes voice commands feel as responsive as button presses
-                    this.recognition.onspeechstart = () => {
-                        console.log('Speech detected - stopping reading immediately');
-                        this.cancel();
-                    };
-
                     this.recognition.onerror = (event) => {
                         console.error('Speech recognition error:', event.error);
                     };
@@ -1979,7 +1972,7 @@
                     },
                     {
                         id: 'send', icon: '🚀', label: 'Send',
-                        voiceMatch: (cmd) => cmd.includes('send'),
+                        voiceMatch: (cmd) => cmd.includes('send') || cmd.includes('stand') || cmd.includes('stands') || cmd.includes('sends'),
                         isAvailable: () => m.state === 'confirming-send',
                         execute: () => this.resolvePending('send')
                     },
