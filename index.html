@@ -1972,7 +1972,7 @@
                     },
                     {
                         id: 'send', icon: '🚀', label: 'Send',
-                        voiceMatch: (cmd) => cmd.includes('send'),
+                        voiceMatch: (cmd) => cmd.includes('send') || cmd.includes('stand') || cmd.includes('stands') || cmd.includes('sends'),
                         isAvailable: () => m.state === 'confirming-send',
                         execute: () => this.resolvePending('send')
                     },
