@@ -1061,17 +1061,6 @@
                     .replace(/=+$/, '');
             }
 
-            // Encode email header value if it contains non-ASCII characters (like emojis)
-            static encodeHeaderValue(value) {
-                // Check if the value contains any non-ASCII characters
-                if (!/[^\x00-\x7F]/.test(value)) {
-                    return value; // Plain ASCII, no encoding needed
-                }
-                // Use RFC 2047 encoded-word syntax: =?charset?B?base64_encoded_text?=
-                const encoded = btoa(unescape(encodeURIComponent(value)));
-                return `=?UTF-8?B?${encoded}?=`;
-            }
-
             // Get list of attachments from email
             static getAttachments(email) {
                 const attachments = [];
