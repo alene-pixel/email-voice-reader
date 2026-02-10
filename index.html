@@ -2635,11 +2635,21 @@
 
                     // Get original email info for quoting
                     const origDate = EmailUtils.getHeader(email, 'Date') || '';
-                    const origBody = EmailUtils.getEmailBody(email);
+                    const rawBody = EmailUtils.getRawEmailBody(email);
 
-                    // Format the quoted original message
-                    const quotedLines = origBody.split('\n').map(line => '> ' + line).join('\n');
+                    // Build the quoted original message in HTML
                     const quoteHeader = `On ${origDate}, ${from} wrote:`;
+                    let quotedContent;
+                    if (rawBody.isHtml) {
+                        quotedContent = rawBody.body;
+                    } else {
+                        quotedContent = `<pre>${rawBody.body}</pre>`;
+                    }
+
+                    const htmlBody = `<p>${text.replace(/\n/g, '<br>')}</p><br>` +
+                        `<div class="gmail_quote">${quoteHeader}<br>` +
+                        `<blockquote style="margin:0 0 0 .8ex;border-left:1px solid #ccc;padding-left:1ex">` +
+                        `${quotedContent}</blockquote></div>`;
 
                     const replySubject = EmailUtils.encodeHeaderValue('Re: ' + subject);
                     const emailLines = [`To: ${toRecipients}`];
@@ -2648,11 +2658,9 @@
                         `Subject: ${replySubject}`,
                         `In-Reply-To: ${messageId}`,
                         `References: ${references}`,
+                        'Content-Type: text/html; charset=UTF-8',
                         '',
-                        text,
-                        '',
-                        quoteHeader,
-                        quotedLines
+                        htmlBody
                     );
 
                     await this.gmail.sendEmail(emailLines.join('\n'), email.threadId);
