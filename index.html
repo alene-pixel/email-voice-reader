@@ -1917,7 +1917,7 @@
                     },
                     {
                         id: 'archive', icon: '📦', label: 'Archive',
-                        voiceMatch: (cmd) => cmd.includes('archive') || cmd.includes('Are by') || cmd.includes('barberry'),
+                        voiceMatch: (cmd) => this.matchArchive(cmd),
                         isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
                         execute: () => this.archiveEmail()
                     },
@@ -2096,6 +2096,17 @@
                        cmd.includes('mark as read') || cmd.includes('mark as red') ||
                        cmd.includes('mark is red') || cmd.includes('mark is read') ||
                        cmd === 'read' || cmd === 'red';
+            }
+
+            matchArchive(cmd) {
+                return cmd.includes('archive') || cmd.includes('are chive') ||
+                       cmd.includes('are five') || cmd.includes('are by') ||
+                       cmd.includes('are kind') || cmd.includes('archie') ||
+                       cmd.includes('ark hive') || cmd.includes('ark ive') ||
+                       cmd.includes('barberry') || cmd.includes('our chi') ||
+                       cmd.includes('our kai') || cmd.includes('our kive') ||
+                       cmd.includes('file it') || cmd.includes('file this') ||
+                       cmd === 'file';
             }
 
             handleCommand(spokenCommand) {
