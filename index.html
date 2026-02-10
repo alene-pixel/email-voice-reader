@@ -2716,11 +2716,15 @@
                     const email = this.model.currentEmail;
                     const subject = EmailUtils.getHeader(email, 'Subject');
                     const body = EmailUtils.getEmailBody(email);
+                    const messageId = EmailUtils.getHeader(email, 'Message-ID');
+                    const references = EmailUtils.getHeader(email, 'References') || messageId;
 
                     const fwdSubject = EmailUtils.encodeHeaderValue('Fwd: ' + subject);
                     const emailParts = [
                         `To: ${toAddress}`,
                         `Subject: ${fwdSubject}`,
+                        `In-Reply-To: ${messageId}`,
+                        `References: ${references}`,
                         ''
                     ];
 
@@ -2732,7 +2736,7 @@
                     emailParts.push('---------- Forwarded message ---------');
                     emailParts.push(body);
 
-                    await this.gmail.sendEmail(emailParts.join('\n'));
+                    await this.gmail.sendEmail(emailParts.join('\n'), email.threadId);
 
                     this.model.setState('idle');
                     this.view.updateStatus('Waiting for command');
