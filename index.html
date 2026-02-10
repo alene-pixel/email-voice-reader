@@ -917,6 +917,41 @@
                 }
             }
 
+            static getRawEmailBody(email) {
+                // Returns the original email body (HTML preferred) without stripping formatting.
+                // Used for forwarding so the original formatting is preserved.
+                if (!email.payload) return { body: '', isHtml: false };
+
+                try {
+                    let plainPart = null, htmlPart = null;
+
+                    if (email.payload.mimeType === 'text/html' && email.payload.body?.data) {
+                        return { body: this.decodeBase64UTF8(email.payload.body.data), isHtml: true };
+                    }
+                    if (email.payload.mimeType === 'text/plain' && email.payload.body?.data) {
+                        return { body: this.decodeBase64UTF8(email.payload.body.data), isHtml: false };
+                    }
+
+                    if (email.payload.parts) {
+                        const findParts = (parts) => {
+                            for (let part of parts) {
+                                if (part.mimeType === 'text/plain' && part.body?.data && !plainPart) plainPart = part;
+                                if (part.mimeType === 'text/html' && part.body?.data && !htmlPart) htmlPart = part;
+                                if (part.parts) findParts(part.parts);
+                            }
+                        };
+                        findParts(email.payload.parts);
+
+                        if (htmlPart) return { body: this.decodeBase64UTF8(htmlPart.body.data), isHtml: true };
+                        if (plainPart) return { body: this.decodeBase64UTF8(plainPart.body.data), isHtml: false };
+                    }
+                } catch (e) {
+                    console.error('Error extracting raw body:', e);
+                }
+
+                return { body: email.snippet || '', isHtml: false };
+            }
+
             static getEmailBody(email) {
                 let body = '';
 
@@ -2715,26 +2750,39 @@
                 try {
                     const email = this.model.currentEmail;
                     const subject = EmailUtils.getHeader(email, 'Subject');
-                    const body = EmailUtils.getEmailBody(email);
+                    const rawBody = EmailUtils.getRawEmailBody(email);
                     const messageId = EmailUtils.getHeader(email, 'Message-ID');
                     const references = EmailUtils.getHeader(email, 'References') || messageId;
+                    const origFrom = EmailUtils.getHeader(email, 'From');
+                    const origDate = EmailUtils.getHeader(email, 'Date') || '';
+                    const origTo = EmailUtils.getHeader(email, 'To');
 
                     const fwdSubject = EmailUtils.encodeHeaderValue('Fwd: ' + subject);
+
+                    // Build forwarded message header info
+                    const fwdHeader = `From: ${origFrom}<br>Date: ${origDate}<br>Subject: ${subject}<br>To: ${origTo}`;
+
+                    // Build the HTML body
+                    let htmlBody = '';
+                    if (forwardMessage) {
+                        htmlBody += `<p>${forwardMessage.replace(/\n/g, '<br>')}</p><br>`;
+                    }
+                    htmlBody += `<div>---------- Forwarded message ---------<br>${fwdHeader}<br><br></div>`;
+                    if (rawBody.isHtml) {
+                        htmlBody += rawBody.body;
+                    } else {
+                        htmlBody += `<pre>${rawBody.body}</pre>`;
+                    }
+
                     const emailParts = [
                         `To: ${toAddress}`,
                         `Subject: ${fwdSubject}`,
                         `In-Reply-To: ${messageId}`,
                         `References: ${references}`,
-                        ''
+                        'Content-Type: text/html; charset=UTF-8',
+                        '',
+                        htmlBody
                     ];
-
-                    if (forwardMessage) {
-                        emailParts.push(forwardMessage);
-                        emailParts.push('');
-                    }
-
-                    emailParts.push('---------- Forwarded message ---------');
-                    emailParts.push(body);
 
                     await this.gmail.sendEmail(emailParts.join('\n'), email.threadId);
 
