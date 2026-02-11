@@ -2603,7 +2603,9 @@
 
                 if (!isEdit) {
                     // Only ask about reply type on first entry, not on edit
-                    const hasOthers = cc || (to && to.includes(','));
+                    const myEmail = await this.gmail.getMyEmail();
+                    const toIsNotMe = to && !to.toLowerCase().includes(myEmail.toLowerCase());
+                    const hasOthers = cc || (to && to.includes(',')) || toIsNotMe;
                     isReplyAll = false;
 
                     if (hasOthers) {
