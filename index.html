@@ -1308,6 +1308,21 @@
                 }, this.wakeLockDelay);
             }
 
+            // Preprocess text for natural TTS pronunciation
+            // Must be called BEFORE splitIntoSentences so email dots aren't treated as sentence boundaries
+            formatTextForSpeech(text) {
+                // Replace email addresses for natural pronunciation
+                // e.g., "user@gmail.com" → "user at gmail dot com"
+                return text.replace(
+                    /\b([A-Z0-9._%+-]+)@([A-Z0-9.-]+\.[A-Z]{2,})\b/gi,
+                    (match, local, domain) => {
+                        const localPart = local.replace(/\./g, ' dot ');
+                        const domainPart = domain.replace(/\./g, ' dot ');
+                        return `${localPart} at ${domainPart}`;
+                    }
+                );
+            }
+
             // Split text into sentences for mobile compatibility
             // Mobile browsers cut off long utterances, so we chunk by sentence
             splitIntoSentences(text) {
@@ -1363,6 +1378,7 @@
                 // NOW safe to reset - old loops have had time to check and exit
                 this.isCancelled = false;
 
+                text = this.formatTextForSpeech(text);
                 const sentences = this.splitIntoSentences(text);
 
                 if (onStart) onStart();
@@ -1399,6 +1415,7 @@
                 // NOW safe to reset - old loops have had time to check and exit
                 this.isCancelled = false;
 
+                text = this.formatTextForSpeech(text);
                 const sentences = this.splitIntoSentences(text);
 
                 // Store for potential resume
