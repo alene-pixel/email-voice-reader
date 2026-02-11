@@ -2320,7 +2320,9 @@
                 // Do NOT add any await/async before this line!
                 this.speech.speak('Welcome to Voice Email Reader! Let me check your inbox.').then(async () => {
                     // Audio is now unlocked - safe to do async operations
-                    this.speech.startListening();
+                    // Brief delay before starting mic so it doesn't pick up
+                    // the tail end of the welcome message from the speaker
+                    setTimeout(() => this.speech.startListening(), 500);
 
                     try {
                         // Fetch emails
