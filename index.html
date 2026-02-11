@@ -1182,6 +1182,7 @@
                 this.recognition = null;
                 this.currentUtterance = null;
                 this.onCommand = null; // Callback when voice command is heard
+                this.allowAutoRestart = false; // Enable auto-restart only after welcome flow is complete
                 this.isCancelled = false; // Track cancellation for chunked speech
                 this.speechGeneration = 0; // Increments each time new speech starts, to invalidate old async loops
 
@@ -1224,7 +1225,8 @@
                     };
 
                     this.recognition.onend = () => {
-                        // Always restart listening
+                        if (!this.allowAutoRestart) return;
+                        // Restart listening once voice session is active
                         setTimeout(() => this.startListening(), 100);
                     };
                 }
@@ -1232,6 +1234,7 @@
                 // Backup: When screen turns back on, try to restart voice listening
                 // This helps recover if listening stopped while the screen was off
                 document.addEventListener('visibilitychange', () => {
+                    if (!this.allowAutoRestart) return;
                     if (!document.hidden && this.recognition) {
                         console.log('Screen turned on - ensuring voice listening is active');
                         // Small delay, then try to start (will safely fail if already running)
@@ -2319,9 +2322,6 @@
                 // CRITICAL: This synchronous speech.speak() call unlocks iOS audio.
                 // Do NOT add any await/async before this line!
                 this.speech.speak('Welcome to Voice Email Reader! Let me check your inbox.').then(async () => {
-                    // Audio is now unlocked - safe to do async operations
-                    this.speech.startListening();
-
                     try {
                         // Fetch emails
                         const emails = await this.gmail.fetchUnreadEmails();
@@ -2330,16 +2330,22 @@
                         if (emails.length === 0) {
                             this.view.updateStatus('No unread emails', 'Your inbox is empty!');
                             this.model.setState('idle');
+                            this.speech.allowAutoRestart = true;
+                            this.speech.startListening();
                             this.speech.speak('You have no unread emails. Great job!');
                         } else {
                             this.view.updateStatus(`Found ${emails.length} unread emails`, 'Starting to read...');
                             this.model.setState('reading');
+                            this.speech.allowAutoRestart = true;
+                            this.speech.startListening();
                             this.readCurrentEmail();
                         }
                     } catch (error) {
                         console.error('Error fetching emails:', error);
                         this.view.updateStatus('Error', 'Could not fetch emails. Please try again.');
                         this.model.setState('idle');
+                        this.speech.allowAutoRestart = true;
+                        this.speech.startListening();
                         this.speech.speak('Sorry, I had trouble fetching your emails. Please try again.');
                     }
                 });
