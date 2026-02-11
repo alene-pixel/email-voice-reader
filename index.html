@@ -1328,8 +1328,7 @@
                         return;
                     }
 
-                    const speechText = this.formatTextForSpeech(text);
-                    this.currentUtterance = new SpeechSynthesisUtterance(speechText);
+                    this.currentUtterance = new SpeechSynthesisUtterance(text);
                     this.currentUtterance.rate = 1.0;
                     this.currentUtterance.pitch = 1.0;
                     this.currentUtterance.volume = 1.0;
@@ -1344,20 +1343,6 @@
                         if (this.synthesis.paused) this.synthesis.resume();
                     }, 100);
                 });
-            }
-
-            // Improve pronunciation of special strings before sending to TTS.
-            // In many browsers, email domains like "gmail.com" are read as "gmail com"
-            // unless we replace punctuation with spoken words.
-            formatTextForSpeech(text) {
-                if (!text) return text;
-
-                return text.replace(
-                    /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
-                    (email) => email
-                        .replace(/@/g, ' at ')
-                        .replace(/\./g, ' dot ')
-                );
             }
 
             // Speak text using chunked sentences for mobile compatibility
