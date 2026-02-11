@@ -551,6 +551,9 @@
                 // Reply-specific state
                 this.isReplyAll = false;
 
+                // Track whether user tapped text area (for edit behavior)
+                this.userTouchedTextArea = false;
+
                 // Listeners for state changes
                 this.listeners = [];
             }
@@ -1899,6 +1902,13 @@
                 this.view.elements.dictationText.addEventListener('input', () => {
                     this.resetDictationTimeout();
                 });
+
+                // Detect user tapping into text area for manual editing
+                this.view.elements.dictationText.addEventListener('focus', () => {
+                    if (this.model.state === 'dictating') {
+                        this.model.userTouchedTextArea = true;
+                    }
+                });
             }
 
             // ========== COMMAND SYSTEM ==========
@@ -2117,7 +2127,14 @@
 
                 // Special handling for dictation mode
                 if (this.model.state === 'dictating') {
-                    this.view.appendDictationText(spokenCommand);
+                    if (!this.model.userTouchedTextArea && this.view.getDictationText()) {
+                        // First speech during edit with untouched text area:
+                        // clear pre-filled text and replace with new dictation
+                        this.view.setDictationText(spokenCommand);
+                        this.model.userTouchedTextArea = true;
+                    } else {
+                        this.view.appendDictationText(spokenCommand);
+                    }
                     this.resetDictationTimeout();
                     return;
                 }
@@ -2557,38 +2574,52 @@
             }
 
             // ========== REPLY FLOW ==========
-            async handleReply() {
+            async handleReply({ isEdit = false } = {}) {
                 const email = this.model.currentEmail;
                 const from = EmailUtils.getHeader(email, 'From');
                 const to = EmailUtils.getHeader(email, 'To');
                 const cc = EmailUtils.getHeader(email, 'Cc');
                 const senderName = from.replace(/<[^>]+>/, '').trim() || from;
 
-                // Check if reply-all is an option
-                const hasOthers = cc || (to && to.includes(','));
-                let isReplyAll = false;
+                // Use stored reply-all choice as default
+                let isReplyAll = this.model.isReplyAll;
 
-                if (hasOthers) {
-                    this.model.setState('confirming-reply-type');
-                    this.view.updateStatus('Choose reply type');
-                    this.speech.speak('This email has other recipients. Say Reply to Sender Only, or Reply All to respond to everyone.');
+                if (!isEdit) {
+                    // Only ask about reply type on first entry, not on edit
+                    const hasOthers = cc || (to && to.includes(','));
+                    isReplyAll = false;
 
-                    const response = await this.waitForResponse();
-                    isReplyAll = response.includes('all');
+                    if (hasOthers) {
+                        this.model.setState('confirming-reply-type');
+                        this.view.updateStatus('Choose reply type');
+                        this.speech.speak('This email has other recipients. Say Reply to Sender Only, or Reply All to respond to everyone.');
+
+                        const response = await this.waitForResponse();
+                        isReplyAll = response.includes('all');
+                    }
                 }
 
                 this.model.isReplyAll = isReplyAll;
 
                 // Start dictation
-                this.model.dictatedText = '';
+                this.model.userTouchedTextArea = false;
                 this.model.setState('dictating');
-                this.view.updateStatus('Listening for response', `Start speaking your reply`);
-                this.view.showDictation('', true);
 
-                if (isReplyAll) {
-                    this.speech.speak('What would you like to say in your response to the group?');
+                if (isEdit) {
+                    // Preserve existing text for editing
+                    this.view.updateStatus('Editing response', 'Speak to replace, or tap text to edit by hand');
+                    this.view.showDictation(this.model.dictatedText, true);
+                    this.speech.speak('Your previous message is shown. Speak to replace it, or tap the text to edit it by hand.');
                 } else {
-                    this.speech.speak(`What would you like to say in your response to ${senderName}?`);
+                    this.model.dictatedText = '';
+                    this.view.updateStatus('Listening for response', `Start speaking your reply`);
+                    this.view.showDictation('', true);
+
+                    if (isReplyAll) {
+                        this.speech.speak('What would you like to say in your response to the group?');
+                    } else {
+                        this.speech.speak(`What would you like to say in your response to ${senderName}?`);
+                    }
                 }
 
                 // Wait for dictation to complete
@@ -2607,7 +2638,7 @@
                     await this.sendReply(responseText, isReplyAll);
                 } else if (confirmation === 'edit') {
                     this.view.hideDictation();
-                    await this.handleReply(); // Retry
+                    await this.handleReply({ isEdit: true }); // Edit: skip reply-type, preserve text
                 } else {
                     this.view.hideDictation();
                     this.model.setState('idle');
@@ -2731,26 +2762,19 @@
                 }
             }
 
-            async forwardEmail(toAddress) {
-                // Ask about adding a message
-                this.model.setState('confirming-forward-message');
-                this.view.updateStatus('Add message?');
-                this.speech.speak('Would you like to add a message to this forward? Say Yes or No.');
-
-                const wantsMessage = await this.waitForResponse();
+            async forwardEmail(toAddress, { isEdit = false } = {}) {
                 let forwardMessage = '';
 
-                if (wantsMessage.includes('yes')) {
-                    // Get message via dictation
-                    this.model.dictatedText = '';
+                if (isEdit) {
+                    // Edit: skip "add a message?" and go straight to dictation with preserved text
+                    this.model.userTouchedTextArea = false;
                     this.model.setState('dictating');
-                    this.view.updateStatus('Listening for message');
-                    this.view.showDictation('', true);
-                    this.speech.speak('What would you like to say in your message?');
+                    this.view.updateStatus('Editing message', 'Speak to replace, or tap text to edit by hand');
+                    this.view.showDictation(this.model.dictatedText, true);
+                    this.speech.speak('Your previous message is shown. Speak to replace it, or tap the text to edit it by hand.');
 
                     forwardMessage = await this.waitForResponse();
 
-                    // Confirm
                     this.model.dictatedText = forwardMessage;
                     this.model.setState('confirming-send');
                     this.view.updateStatus('Confirm forward');
@@ -2760,12 +2784,49 @@
                     this.view.hideDictation();
 
                     if (confirmation === 'edit') {
-                        return await this.forwardEmail(toAddress);
+                        return await this.forwardEmail(toAddress, { isEdit: true });
                     } else if (confirmation !== 'send') {
                         this.model.setState('idle');
                         this.view.updateStatus('Waiting for command');
                         this.speech.speak('Forward cancelled. What would you like to do with this email?');
                         return;
+                    }
+                } else {
+                    // First time: ask about adding a message
+                    this.model.setState('confirming-forward-message');
+                    this.view.updateStatus('Add message?');
+                    this.speech.speak('Would you like to add a message to this forward? Say Yes or No.');
+
+                    const wantsMessage = await this.waitForResponse();
+
+                    if (wantsMessage.includes('yes')) {
+                        // Get message via dictation
+                        this.model.dictatedText = '';
+                        this.model.userTouchedTextArea = false;
+                        this.model.setState('dictating');
+                        this.view.updateStatus('Listening for message');
+                        this.view.showDictation('', true);
+                        this.speech.speak('What would you like to say in your message?');
+
+                        forwardMessage = await this.waitForResponse();
+
+                        // Confirm
+                        this.model.dictatedText = forwardMessage;
+                        this.model.setState('confirming-send');
+                        this.view.updateStatus('Confirm forward');
+                        this.speech.speak(`You said: ${forwardMessage}. Say Send to forward with this message, Edit to try again, or Cancel to go back.`);
+
+                        const confirmation = await this.waitForResponse();
+                        this.view.hideDictation();
+
+                        if (confirmation === 'edit') {
+                            return await this.forwardEmail(toAddress, { isEdit: true });
+                        } else if (confirmation !== 'send') {
+                            this.model.setState('idle');
+                            this.view.updateStatus('Waiting for command');
+                            this.speech.speak('Forward cancelled. What would you like to do with this email?');
+                            return;
+                        }
                     }
                 }
 
