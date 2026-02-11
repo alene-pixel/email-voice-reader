@@ -1885,7 +1885,6 @@
                 // Pending promise resolver for multi-step flows
                 this.pendingResolver = null;
                 this.dictationTimeout = null;
-                this.ignoreWelcomeEchoUntil = 0;
 
                 // Wire up speech recognition
                 this.speech.onCommand = (cmd) => this.handleCommand(cmd);
@@ -2113,16 +2112,6 @@
             handleCommand(spokenCommand) {
                 this.view.updateStatus('I heard you say:', `"${spokenCommand}"`);
 
-                const spokenLower = spokenCommand.toLowerCase().trim();
-                const shouldIgnoreWelcomeEcho =
-                    this.model.state === 'loading' &&
-                    Date.now() < this.ignoreWelcomeEchoUntil &&
-                    (spokenLower.startsWith('welcome') || spokenLower.startsWith('welcome to'));
-
-                if (shouldIgnoreWelcomeEcho) {
-                    return;
-                }
-
                 // Special handling for dictation mode
                 if (this.model.state === 'dictating') {
                     this.view.appendDictationText(spokenCommand);
@@ -2142,6 +2131,7 @@
                 }
 
                 // Find matching command from available commands (use lowercase for case-insensitive matching)
+                const spokenLower = spokenCommand.toLowerCase();
                 for (const cmd of this.currentCommands || []) {
                     if (cmd.voiceMatch && cmd.voiceMatch(spokenLower)) {
                         cmd.execute();
@@ -2328,7 +2318,6 @@
 
                 // CRITICAL: This synchronous speech.speak() call unlocks iOS audio.
                 // Do NOT add any await/async before this line!
-                this.ignoreWelcomeEchoUntil = Date.now() + 2500;
                 this.speech.speak('Welcome to Voice Email Reader! Let me check your inbox.').then(async () => {
                     // Audio is now unlocked - safe to do async operations
                     this.speech.startListening();
