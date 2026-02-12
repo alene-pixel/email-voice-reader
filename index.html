@@ -1908,6 +1908,7 @@
                 // Pending promise resolver for multi-step flows
                 this.pendingResolver = null;
                 this.dictationTimeout = null;
+                this.dictationSilenceTimeout = null;
 
                 // Wire up speech recognition
                 this.speech.onCommand = (cmd) => this.handleCommand(cmd);
@@ -2297,6 +2298,8 @@
             // ========== DICTATION HELPERS ==========
             resetDictationTimeout() {
                 if (this.dictationTimeout) clearTimeout(this.dictationTimeout);
+                // User has spoken or typed, so reset the silence timeout too
+                this.clearDictationSilenceTimeout();
                 this.dictationTimeout = setTimeout(() => {
                     const text = this.view.getDictationText();
                     if (text) {
@@ -2306,8 +2309,45 @@
                 }, 4000);
             }
 
+            // Start a 30-second silence timeout that cancels dictation if nothing is said or typed
+            startDictationSilenceTimeout() {
+                this.clearDictationSilenceTimeout();
+                this.dictationSilenceTimeout = setTimeout(() => {
+                    if (this.model.state === 'dictating') {
+                        const text = this.view.getDictationText();
+                        if (text) {
+                            // If there's text, finish dictation normally
+                            this.finishDictation();
+                        } else {
+                            // No text at all — cancel and go back to idle
+                            this.cancelDictation();
+                        }
+                    }
+                }, 30000);
+            }
+
+            clearDictationSilenceTimeout() {
+                if (this.dictationSilenceTimeout) {
+                    clearTimeout(this.dictationSilenceTimeout);
+                    this.dictationSilenceTimeout = null;
+                }
+            }
+
+            cancelDictation() {
+                if (this.dictationTimeout) clearTimeout(this.dictationTimeout);
+                this.clearDictationSilenceTimeout();
+                this.view.hideDictation();
+                this.model.dictatedText = '';
+                this.speech.speak('No response detected. Going back.');
+                // Resolve with special cancel value so the calling flow exits cleanly
+                if (this.pendingResolver) {
+                    this.resolvePending('__dictation_cancelled__');
+                }
+            }
+
             finishDictation() {
                 if (this.dictationTimeout) clearTimeout(this.dictationTimeout);
+                this.clearDictationSilenceTimeout();
                 this.model.dictatedText = this.view.getDictationText();
                 if (this.pendingResolver) {
                     this.resolvePending(this.model.dictatedText);
@@ -2623,6 +2663,7 @@
                 // Start dictation
                 this.model.userTouchedTextArea = false;
                 this.model.setState('dictating');
+                this.startDictationSilenceTimeout();
 
                 if (isEdit) {
                     // Preserve existing text for editing
@@ -2643,6 +2684,14 @@
 
                 // Wait for dictation to complete
                 const responseText = await this.waitForResponse();
+
+                // If dictation timed out, go back to idle
+                if (responseText === '__dictation_cancelled__') {
+                    this.view.hideDictation();
+                    this.model.setState('idle');
+                    this.view.updateStatus('Waiting for command');
+                    return;
+                }
 
                 // Confirm
                 this.model.dictatedText = responseText;
@@ -2788,11 +2837,19 @@
                     // Edit: skip "add a message?" and go straight to dictation with preserved text
                     this.model.userTouchedTextArea = false;
                     this.model.setState('dictating');
+                    this.startDictationSilenceTimeout();
                     this.view.updateStatus('Editing message', 'Speak to replace, or tap text to edit by hand');
                     this.view.showDictation(this.model.dictatedText, true);
                     this.speech.speak('Your previous message is shown. Speak to replace it, or tap the text to edit it by hand.');
 
                     forwardMessage = await this.waitForResponse();
+
+                    if (forwardMessage === '__dictation_cancelled__') {
+                        this.view.hideDictation();
+                        this.model.setState('idle');
+                        this.view.updateStatus('Waiting for command');
+                        return;
+                    }
 
                     this.model.dictatedText = forwardMessage;
                     this.model.setState('confirming-send');
@@ -2823,11 +2880,19 @@
                         this.model.dictatedText = '';
                         this.model.userTouchedTextArea = false;
                         this.model.setState('dictating');
+                        this.startDictationSilenceTimeout();
                         this.view.updateStatus('Listening for message');
                         this.view.showDictation('', true);
                         this.speech.speak('What would you like to say in your message?');
 
                         forwardMessage = await this.waitForResponse();
+
+                        if (forwardMessage === '__dictation_cancelled__') {
+                            this.view.hideDictation();
+                            this.model.setState('idle');
+                            this.view.updateStatus('Waiting for command');
+                            return;
+                        }
 
                         // Confirm
                         this.model.dictatedText = forwardMessage;
