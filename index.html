@@ -1558,8 +1558,11 @@
                     charactersSpoken += sentences[i].length;
                 }
 
+                // Check if we finished naturally (not interrupted by another skip/cancel)
+                const finishedNaturally = !this.isCancelled && myGeneration === this.speechGeneration;
+
                 // If we finished naturally, clear resume state
-                if (!this.isCancelled && myGeneration === this.speechGeneration) {
+                if (finishedNaturally) {
                     this.canResume = false;
                     this.remainingSentences = [];
                 }
@@ -1567,7 +1570,7 @@
                 // Allow screen to turn off after a delay (gives user time to respond)
                 this.releaseWakeLockAfterDelay();
 
-                return true;
+                return finishedNaturally ? 'finished' : 'interrupted';
             }
 
             // Jump to a specific sentence index and resume reading from there
@@ -2567,9 +2570,9 @@
                 if (this.speech.canResume) {
                     this.model.setState('reading');
                     this.view.updateStatus('Continuing email...');
-                    await this.speech.resume();
-                    // After resume finishes (or is interrupted again), update state
-                    if (!this.speech.isCancelled) {
+                    const result = await this.speech.resume();
+                    // Only update state if resume finished naturally (not interrupted by skip/rewind)
+                    if (result === 'finished') {
                         this.model.setState('idle');
                         this.view.updateStatus('Finished reading', 'What would you like to do with this email?');
                     }
@@ -2583,16 +2586,16 @@
             }
 
             async handleSkipForward() {
-                const result = this.speech.skipForward(3);
-                if (result === 'past-end') {
+                const skipResult = this.speech.skipForward(3);
+                if (skipResult === 'past-end') {
                     // Past the end of the email — move to next email
                     this.nextEmail();
                 } else {
                     // Jump succeeded — resume reading from new position
                     this.model.setState('reading');
                     this.view.updateStatus('Skipping forward...');
-                    await this.speech.resume();
-                    if (!this.speech.isCancelled) {
+                    const result = await this.speech.resume();
+                    if (result === 'finished') {
                         this.model.setState('idle');
                         this.view.updateStatus('Finished reading', 'What would you like to do with this email?');
                     }
@@ -2603,8 +2606,8 @@
                 this.speech.skipBack(3);
                 this.model.setState('reading');
                 this.view.updateStatus('Rewinding...');
-                await this.speech.resume();
-                if (!this.speech.isCancelled) {
+                const result = await this.speech.resume();
+                if (result === 'finished') {
                     this.model.setState('idle');
                     this.view.updateStatus('Finished reading', 'What would you like to do with this email?');
                 }
