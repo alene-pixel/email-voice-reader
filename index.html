@@ -1193,6 +1193,8 @@
                 this.remainingSentences = []; // Sentences left to speak when interrupted
                 this.canResume = false; // Whether there's something to resume
                 this.resumeView = null; // View reference for scroll sync on resume
+                this.fullSentences = null; // Complete sentence list (preserved across resume/skip)
+                this.absoluteSentenceIndex = 0; // Position within fullSentences (survives resume)
 
                 // Character-based scroll progress tracking
                 this.totalCharacters = 0;
@@ -1429,6 +1431,7 @@
 
                 // Store for potential resume
                 this.allSentences = sentences;
+                this.fullSentences = sentences; // Preserve full list for skip forward/back
                 this.currentSentenceIndex = 0;
                 this.resumeView = view;
                 this.canResume = true;
@@ -1450,6 +1453,7 @@
                 for (let i = 0; i < sentences.length; i++) {
                     // Track current position for resume
                     this.currentSentenceIndex = i;
+                    this.absoluteSentenceIndex = i;
                     this.charactersSpoken = charactersSpoken;
 
                     // Check both flag and generation
@@ -1511,6 +1515,7 @@
                 const sentences = this.remainingSentences;
                 this.allSentences = sentences;
                 this.currentSentenceIndex = 0;
+                const resumeAbsoluteStart = this.absoluteSentenceIndex || 0;
 
                 // Continue character count from where we left off
                 let charactersSpoken = this.charactersSpoken || 0;
@@ -1521,6 +1526,7 @@
                 // Speak remaining sentences sequentially with synchronized scrolling
                 for (let i = 0; i < sentences.length; i++) {
                     this.currentSentenceIndex = i;
+                    this.absoluteSentenceIndex = resumeAbsoluteStart + i;
                     this.charactersSpoken = charactersSpoken;
 
                     if (this.isCancelled || myGeneration !== this.speechGeneration) break;
@@ -1547,12 +1553,65 @@
                 return true;
             }
 
+            // Jump to a specific sentence index and resume reading from there
+            // Used by skip forward/back to reposition within the current email
+            jumpToSentence(targetIndex) {
+                // Use fullSentences (the complete list) so skipping works even after resume()
+                const sentences = this.fullSentences || this.allSentences;
+                if (!sentences || sentences.length === 0) {
+                    return false; // No sentences to jump to
+                }
+
+                // Clamp target to valid range
+                targetIndex = Math.max(0, Math.min(targetIndex, sentences.length - 1));
+
+                // Cancel current speech
+                this.isCancelled = true;
+                if (this.synthesis) this.synthesis.cancel();
+
+                // Restore full sentence list and set up resume from target position
+                this.allSentences = sentences;
+                this.remainingSentences = sentences.slice(targetIndex);
+                this.currentSentenceIndex = targetIndex;
+                this.absoluteSentenceIndex = targetIndex;
+                this.canResume = true;
+
+                // Recalculate charactersSpoken for scroll sync
+                let chars = 0;
+                for (let i = 0; i < targetIndex; i++) {
+                    chars += sentences[i].length;
+                }
+                this.charactersSpoken = chars;
+
+                return true;
+            }
+
+            // Skip forward by a number of sentences
+            skipForward(count = 3) {
+                const sentences = this.fullSentences || this.allSentences;
+                const target = (this.absoluteSentenceIndex || 0) + count;
+                if (sentences && target >= sentences.length) {
+                    return 'past-end'; // Signal that we've gone past the end
+                }
+                this.jumpToSentence(target);
+                return 'ok';
+            }
+
+            // Skip backward by a number of sentences
+            skipBack(count = 3) {
+                const target = (this.absoluteSentenceIndex || 0) - count;
+                this.jumpToSentence(Math.max(0, target));
+                return 'ok';
+            }
+
             // Clear resume state (call when moving to a different email)
             clearResumeState() {
                 this.canResume = false;
                 this.remainingSentences = [];
                 this.allSentences = null;
+                this.fullSentences = null;
                 this.currentSentenceIndex = 0;
+                this.absoluteSentenceIndex = 0;
                 this.charactersSpoken = 0;
                 this.totalCharacters = 0;
                 this.scrollStartThreshold = 0;
@@ -1960,6 +2019,20 @@
                         voiceMatch: (cmd) => this.matchArchive(cmd),
                         isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
                         execute: () => this.archiveEmail()
+                    },
+                    // Skip forward/back commands (must be before 'forward', 'next', and 'previous'
+                    // to avoid "skip forward" matching "forward" or "skip" matching "next")
+                    {
+                        id: 'skip-forward', icon: '🏃🏿‍♀️‍➡️', label: 'Fast Forward',
+                        voiceMatch: (cmd) => cmd.includes('skip forward') || cmd.includes('fast forward') || cmd.includes('jump ahead'),
+                        isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
+                        execute: () => this.handleSkipForward()
+                    },
+                    {
+                        id: 'skip-back', icon: '🏃🏻‍♂️', label: 'Rewind',
+                        voiceMatch: (cmd) => cmd.includes('skip back') || cmd.includes('rewind') || cmd.includes('re wind'),
+                        isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
+                        execute: () => this.handleSkipBack()
                     },
                     {
                         id: 'reply', icon: '↩️', label: 'Reply',
@@ -2491,6 +2564,34 @@
                     this.readCurrentEmail();
                 } else {
                     await this.speech.speak('No email to continue. Say "start" to check for new emails.');
+                }
+            }
+
+            async handleSkipForward() {
+                const result = this.speech.skipForward(3);
+                if (result === 'past-end') {
+                    // Past the end of the email — move to next email
+                    this.nextEmail();
+                } else {
+                    // Jump succeeded — resume reading from new position
+                    this.model.setState('reading');
+                    this.view.updateStatus('Skipping forward...');
+                    await this.speech.resume();
+                    if (!this.speech.isCancelled) {
+                        this.model.setState('idle');
+                        this.view.updateStatus('Finished reading', 'What would you like to do with this email?');
+                    }
+                }
+            }
+
+            async handleSkipBack() {
+                this.speech.skipBack(3);
+                this.model.setState('reading');
+                this.view.updateStatus('Rewinding...');
+                await this.speech.resume();
+                if (!this.speech.isCancelled) {
+                    this.model.setState('idle');
+                    this.view.updateStatus('Finished reading', 'What would you like to do with this email?');
                 }
             }
 
