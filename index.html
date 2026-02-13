@@ -2066,7 +2066,7 @@
                     },
                     {
                         id: 'spam', icon: '⚠️', label: 'Spam',
-                        voiceMatch: (cmd) => cmd.includes('spam') || cmd.includes('mark as spam') || cmd.includes('mark spam'),
+                        voiceMatch: (cmd) => cmd.includes('spam') || cmd.includes('mark as spam') || cmd.includes('mark spam') || cmd.includes('marcus spam') || cmd.includes('marcus van'),
                         isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
                         execute: () => this.markAsSpam()
                     },
