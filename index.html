@@ -1515,7 +1515,6 @@
                 const sentences = this.remainingSentences;
                 this.allSentences = sentences;
                 this.currentSentenceIndex = 0;
-                const resumeAbsoluteStart = this.absoluteSentenceIndex || 0;
 
                 // Continue character count from where we left off
                 let charactersSpoken = this.charactersSpoken || 0;
@@ -1526,7 +1525,7 @@
                 // Speak remaining sentences sequentially with synchronized scrolling
                 for (let i = 0; i < sentences.length; i++) {
                     this.currentSentenceIndex = i;
-                    this.absoluteSentenceIndex = resumeAbsoluteStart + i;
+                    if (i > 0) this.absoluteSentenceIndex++;
                     this.charactersSpoken = charactersSpoken;
 
                     if (this.isCancelled || myGeneration !== this.speechGeneration) break;
