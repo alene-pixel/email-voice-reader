@@ -997,8 +997,22 @@
                             };
 
                             findParts(email.payload.parts);
-                            const partToUse = plainPart || htmlPart;
-                            if (partToUse) {
+                            let partToUse;
+                            if (plainPart && htmlPart) {
+                                // If plain text is much shorter than HTML content,
+                                // it's likely a stub ("your email can't display HTML").
+                                // Use the HTML version instead (tags get stripped below).
+                                const plainText = this.decodeBase64UTF8(plainPart.body.data);
+                                const htmlText = this.decodeBase64UTF8(htmlPart.body.data);
+                                const htmlStripped = htmlText.replace(/<[^>]*>/g, '').trim();
+                                if (htmlStripped.length > plainText.trim().length * 3) {
+                                    partToUse = htmlPart;
+                                } else {
+                                    partToUse = plainPart;
+                                }
+                            } else {
+                                partToUse = plainPart || htmlPart;
+                            }                            if (partToUse) {
                                 body = this.decodeBase64UTF8(partToUse.body.data);
                             }
                         }
