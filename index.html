@@ -2020,20 +2020,6 @@
                         isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
                         execute: () => this.archiveEmail()
                     },
-                    // Skip forward/back commands (must be before 'forward', 'next', and 'previous'
-                    // to avoid "skip forward" matching "forward" or "skip" matching "next")
-                    {
-                        id: 'skip-forward', icon: '🏃🏿‍♀️‍➡️', label: 'Fast Forward',
-                        voiceMatch: (cmd) => cmd.includes('skip forward') || cmd.includes('fast forward') || cmd.includes('jump ahead'),
-                        isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
-                        execute: () => this.handleSkipForward()
-                    },
-                    {
-                        id: 'skip-back', icon: '🏃🏻‍♂️', label: 'Rewind',
-                        voiceMatch: (cmd) => cmd.includes('skip back') || cmd.includes('rewind') || cmd.includes('re wind'),
-                        isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
-                        execute: () => this.handleSkipBack()
-                    },
                     {
                         id: 'reply', icon: '↩️', label: 'Reply',
                         voiceMatch: (cmd) => cmd.includes('respond') || cmd.includes('reply'),
@@ -2057,6 +2043,18 @@
                         voiceMatch: (cmd) => cmd.includes('previous') || cmd.includes('back'),
                         isAvailable: () => m.hasEmail && m.canGoPrevious && ['reading', 'idle'].includes(m.state),
                         execute: () => this.previousEmail()
+                    },
+                    {
+                        id: 'skip-forward', icon: '🏃🏿‍♀️‍➡️', label: 'Fast Forward',
+                        voiceMatch: (cmd) => cmd.includes('skip forward') || cmd.includes('fast forward') || cmd.includes('jump ahead'),
+                        isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
+                        execute: () => this.handleSkipForward()
+                    },
+                    {
+                        id: 'skip-back', icon: '🏃🏻‍♂️', label: 'Rewind',
+                        voiceMatch: (cmd) => cmd.includes('skip back') || cmd.includes('rewind') || cmd.includes('re wind'),
+                        isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
+                        execute: () => this.handleSkipBack()
                     },
                     {
                         id: 'unsubscribe', icon: '🚫', label: 'Unsubscribe',
