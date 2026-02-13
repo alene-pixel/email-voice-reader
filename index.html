@@ -960,11 +960,10 @@
 
                 if (email.payload) {
                     try {
-                        if (email.payload.body && email.payload.body.data) {
-                            body = this.decodeBase64UTF8(email.payload.body.data);
-                        } else if (email.payload.parts) {
-                            let plainPart = null, htmlPart = null;
+                        let plainPart = null, htmlPart = null;
 
+                        // Check parts first (nested multipart content)
+                        if (email.payload.parts) {
                             const findParts = (parts) => {
                                 for (let part of parts) {
                                     if (part.mimeType === 'text/plain' && part.body?.data && !plainPart) plainPart = part;
@@ -972,12 +971,30 @@
                                     if (part.parts) findParts(part.parts);
                                 }
                             };
-
                             findParts(email.payload.parts);
-                            const partToUse = plainPart || htmlPart;
-                            if (partToUse) {
+                        }
+
+                        if (plainPart || htmlPart) {
+                            // Prefer plain text for speech, but use HTML if plain text is a stub
+                            if (plainPart && htmlPart) {
+                                const plainText = this.decodeBase64UTF8(plainPart.body.data);
+                                if (plainText.trim().length < 200) {
+                                    const htmlBody = this.decodeBase64UTF8(htmlPart.body.data);
+                                    if (htmlBody.length > plainText.length * 3) {
+                                        body = htmlBody;
+                                    } else {
+                                        body = plainText;
+                                    }
+                                } else {
+                                    body = this.decodeBase64UTF8(plainPart.body.data);
+                                }
+                            } else {
+                                const partToUse = plainPart || htmlPart;
                                 body = this.decodeBase64UTF8(partToUse.body.data);
                             }
+                        } else if (email.payload.body && email.payload.body.data) {
+                            // Simple single-part email — use top-level body
+                            body = this.decodeBase64UTF8(email.payload.body.data);
                         }
                     } catch (e) {
                         console.error('Error extracting body:', e);
