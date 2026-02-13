@@ -974,21 +974,7 @@
                             };
 
                             findParts(email.payload.parts);
-                            let partToUse;
-                            if (plainPart && htmlPart) {
-                                // Check if plain text is just a short fallback/stub
-                                // (e.g. "your email software can't display HTML emails")
-                                const plainText = this.decodeBase64UTF8(plainPart.body.data);
-                                const htmlText = this.decodeBase64UTF8(htmlPart.body.data);
-                                const htmlStripped = htmlText.replace(/<[^>]*>/g, '').trim();
-                                if (htmlStripped.length > plainText.trim().length * 3 && plainText.trim().length < 500) {
-                                    partToUse = htmlPart;
-                                } else {
-                                    partToUse = plainPart;
-                                }
-                            } else {
-                                partToUse = plainPart || htmlPart;
-                            }
+                            const partToUse = plainPart || htmlPart;
                             if (partToUse) {
                                 body = this.decodeBase64UTF8(partToUse.body.data);
                             }
