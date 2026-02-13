@@ -1313,7 +1313,7 @@
             formatTextForSpeech(text) {
                 // Replace email addresses for natural pronunciation
                 // e.g., "user@gmail.com" → "user at gmail dot com"
-                return text.replace(
+                text = text.replace(
                     /\b([A-Z0-9._%+-]+)@([A-Z0-9.-]+\.[A-Z]{2,})\b/gi,
                     (match, local, domain) => {
                         const localPart = local.replace(/\./g, ' dot ');
@@ -1321,6 +1321,15 @@
                         return `${localPart} at ${domainPart}`;
                     }
                 );
+                // Replace website domains for natural pronunciation
+                // e.g., "Chase.com" → "Chase dot com", "www.example.co.uk" → "www dot example dot co dot uk"
+                text = text.replace(
+                    /\b([A-Z0-9](?:[A-Z0-9-]*[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]*[A-Z0-9])?)*)\.([A-Z]{2,})\b/gi,
+                    (match) => {
+                        return match.replace(/\./g, ' dot ');
+                    }
+                );
+                return text;
             }
 
             // Split text into sentences for mobile compatibility
