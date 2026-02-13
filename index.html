@@ -2045,14 +2045,14 @@
                         execute: () => this.previousEmail()
                     },
                     {
-                        id: 'skip-forward', icon: '🏃🏿‍♀️‍➡️', label: 'Fast Forward',
-                        voiceMatch: (cmd) => cmd.includes('skip forward') || cmd.includes('fast forward') || cmd.includes('jump ahead'),
+                        id: 'leap', icon: '🏃🏿‍♀️‍➡️', label: 'Leap',
+                        voiceMatch: (cmd) => cmd.includes('leap') || cmd.includes('lee'),
                         isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
                         execute: () => this.handleSkipForward()
                     },
                     {
-                        id: 'skip-back', icon: '🏃🏻‍♂️', label: 'Rewind',
-                        voiceMatch: (cmd) => cmd.includes('skip back') || cmd.includes('rewind') || cmd.includes('re wind'),
+                        id: 'rewind', icon: '🏃🏻‍♂️', label: 'Rewind',
+                        voiceMatch: (cmd) => cmd.includes('rewind') || cmd.includes('re wind'),
                         isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
                         execute: () => this.handleSkipBack()
                     },
