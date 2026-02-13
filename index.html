@@ -997,22 +997,7 @@
                             };
 
                             findParts(email.payload.parts);
-                            let partToUse;
-                            if (plainPart && htmlPart) {
-                                // If plain text is much shorter than HTML content,
-                                // it's likely a stub ("your email can't display HTML").
-                                // Use the HTML version instead (tags get stripped below).
-                                const plainText = this.decodeBase64UTF8(plainPart.body.data);
-                                const htmlText = this.decodeBase64UTF8(htmlPart.body.data);
-                                const htmlStripped = htmlText.replace(/<[^>]*>/g, '').trim();
-                                if (htmlStripped.length > plainText.trim().length * 3) {
-                                    partToUse = htmlPart;
-                                } else {
-                                    partToUse = plainPart;
-                                }
-                            } else {
-                                partToUse = plainPart || htmlPart;
-                            }
+                            const partToUse = plainPart || htmlPart;
                             if (partToUse) {
                                 body = this.decodeBase64UTF8(partToUse.body.data);
                             }
@@ -1469,7 +1454,7 @@
 
                 // Store for potential resume
                 this.allSentences = sentences;
-                this.fullSentences = sentences; // Preserve full list for leap/rewind
+                this.fullSentences = sentences; // Preserve full list for skip forward/back
                 this.currentSentenceIndex = 0;
                 this.resumeView = view;
                 this.canResume = true;
@@ -1591,9 +1576,9 @@
             }
 
             // Jump to a specific sentence index and resume reading from there
-            // Used by leap/rewind to reposition within the current email
+            // Used by skip forward/back to reposition within the current email
             jumpToSentence(targetIndex) {
-                // Use fullSentences (the complete list) so leaping works even after resume()
+                // Use fullSentences (the complete list) so skipping works even after resume()
                 const sentences = this.fullSentences || this.allSentences;
                 if (!sentences || sentences.length === 0) {
                     return false; // No sentences to jump to
@@ -1623,8 +1608,8 @@
                 return true;
             }
 
-            // Leap forward by a number of sentences
-            Leap (count = 3) {
+            // Skip forward by a number of sentences
+            skipForward(count = 3) {
                 const sentences = this.fullSentences || this.allSentences;
                 const target = (this.absoluteSentenceIndex || 0) + count;
                 if (sentences && target >= sentences.length) {
@@ -1634,8 +1619,8 @@
                 return 'ok';
             }
 
-            // Rewind by a number of sentences
-            Rewind (count = 3) {
+            // Skip backward by a number of sentences
+            skipBack(count = 3) {
                 const target = (this.absoluteSentenceIndex || 0) - count;
                 this.jumpToSentence(Math.max(0, target));
                 return 'ok';
@@ -2090,13 +2075,13 @@
                         id: 'leap', icon: '🏃🏿‍♀️‍➡️', label: 'Leap',
                         voiceMatch: (cmd) => cmd.includes('leap') || cmd.includes('lee') || cmd.includes('leak'),
                         isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
-                        execute: () => this.handleLeap()
+                        execute: () => this.handleSkipForward()
                     },
                     {
                         id: 'rewind', icon: '🏃🏻‍♂️', label: 'Rewind',
                         voiceMatch: (cmd) => cmd.includes('rewind') || cmd.includes('re wind'),
                         isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
-                        execute: () => this.handleRewind()
+                        execute: () => this.handleSkipBack()
                     },
                     {
                         id: 'unsubscribe', icon: '🚫', label: 'Unsubscribe',
@@ -2607,15 +2592,15 @@
                 }
             }
 
-            async handleLeap() {
-                const result = this.speech.Leap(3);
+            async handleSkipForward() {
+                const result = this.speech.skipForward(3);
                 if (result === 'past-end') {
                     // Past the end of the email — move to next email
                     this.nextEmail();
                 } else {
                     // Jump succeeded — resume reading from new position
                     this.model.setState('reading');
-                    this.view.updateStatus('Leaping...');
+                    this.view.updateStatus('Skipping forward...');
                     await this.speech.resume();
                     if (!this.speech.isCancelled) {
                         this.model.setState('idle');
@@ -2624,8 +2609,8 @@
                 }
             }
 
-            async handleRewind() {
-                this.speech.Rewind(3);
+            async handleSkipBack() {
+                this.speech.skipBack(3);
                 this.model.setState('reading');
                 this.view.updateStatus('Rewinding...');
                 await this.speech.resume();
