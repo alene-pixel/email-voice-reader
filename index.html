@@ -1469,7 +1469,7 @@
 
                 // Store for potential resume
                 this.allSentences = sentences;
-                this.fullSentences = sentences; // Preserve full list for skip forward/back
+                this.fullSentences = sentences; // Preserve full list for leap/rewind
                 this.currentSentenceIndex = 0;
                 this.resumeView = view;
                 this.canResume = true;
@@ -1591,9 +1591,9 @@
             }
 
             // Jump to a specific sentence index and resume reading from there
-            // Used by skip forward/back to reposition within the current email
+            // Used by leap/rewind to reposition within the current email
             jumpToSentence(targetIndex) {
-                // Use fullSentences (the complete list) so skipping works even after resume()
+                // Use fullSentences (the complete list) so leaping works even after resume()
                 const sentences = this.fullSentences || this.allSentences;
                 if (!sentences || sentences.length === 0) {
                     return false; // No sentences to jump to
@@ -1623,8 +1623,8 @@
                 return true;
             }
 
-            // Skip forward by a number of sentences
-            skipForward(count = 3) {
+            // Leap forward by a number of sentences
+            Leap (count = 3) {
                 const sentences = this.fullSentences || this.allSentences;
                 const target = (this.absoluteSentenceIndex || 0) + count;
                 if (sentences && target >= sentences.length) {
@@ -1634,8 +1634,8 @@
                 return 'ok';
             }
 
-            // Skip backward by a number of sentences
-            skipBack(count = 3) {
+            // Rewind by a number of sentences
+            Rewind (count = 3) {
                 const target = (this.absoluteSentenceIndex || 0) - count;
                 this.jumpToSentence(Math.max(0, target));
                 return 'ok';
@@ -2088,15 +2088,15 @@
                     },
                     {
                         id: 'leap', icon: '🏃🏿‍♀️‍➡️', label: 'Leap',
-                        voiceMatch: (cmd) => cmd.includes('leap') || cmd.includes('lee'),
+                        voiceMatch: (cmd) => cmd.includes('leap') || cmd.includes('lee') || cmd.includes('leak'),
                         isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
-                        execute: () => this.handleSkipForward()
+                        execute: () => this.handleLeap()
                     },
                     {
                         id: 'rewind', icon: '🏃🏻‍♂️', label: 'Rewind',
                         voiceMatch: (cmd) => cmd.includes('rewind') || cmd.includes('re wind'),
                         isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
-                        execute: () => this.handleSkipBack()
+                        execute: () => this.handleRewind()
                     },
                     {
                         id: 'unsubscribe', icon: '🚫', label: 'Unsubscribe',
@@ -2607,15 +2607,15 @@
                 }
             }
 
-            async handleSkipForward() {
-                const result = this.speech.skipForward(3);
+            async handleLeap() {
+                const result = this.speech.Leap(3);
                 if (result === 'past-end') {
                     // Past the end of the email — move to next email
                     this.nextEmail();
                 } else {
                     // Jump succeeded — resume reading from new position
                     this.model.setState('reading');
-                    this.view.updateStatus('Skipping forward...');
+                    this.view.updateStatus('Leaping...');
                     await this.speech.resume();
                     if (!this.speech.isCancelled) {
                         this.model.setState('idle');
@@ -2624,8 +2624,8 @@
                 }
             }
 
-            async handleSkipBack() {
-                this.speech.skipBack(3);
+            async handleRewind() {
+                this.speech.Rewind(3);
                 this.model.setState('reading');
                 this.view.updateStatus('Rewinding...');
                 await this.speech.resume();
