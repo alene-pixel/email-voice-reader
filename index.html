@@ -2600,7 +2600,7 @@
                 } else {
                     // Jump succeeded — resume reading from new position
                     this.model.setState('reading');
-                    this.view.updateStatus('Skipping forward...');
+                    this.view.updateStatus('Leaping...');
                     await this.speech.resume();
                     if (!this.speech.isCancelled) {
                         this.model.setState('idle');
