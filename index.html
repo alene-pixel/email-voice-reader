@@ -2078,8 +2078,8 @@
                         execute: () => this.handleSkipForward()
                     },
                     {
-                        id: 'rewind', icon: '🏃🏻‍♂️', label: 'Rewind',
-                        voiceMatch: (cmd) => cmd.includes('rewind') || cmd.includes('re wind'),
+                        id: 'rewind', icon: '🏃🏻‍♂️', label: 'Retreat',
+                        voiceMatch: (cmd) => cmd.includes('rewind') || cmd.includes('re wind') || cmd.includes('retreat'),
                         isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
                         execute: () => this.handleSkipBack()
                     },
