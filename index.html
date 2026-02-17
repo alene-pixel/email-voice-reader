@@ -2288,7 +2288,7 @@
                 // If we were reading, change state to idle so Continue button appears
                 if (this.model.state === 'reading' && this.model.hasEmail) {
                     this.model.setState('idle');
-                    this.view.updateStatus('Stopped reading', 'Say "play" to continue');
+                    this.view.updateStatus('I heard you say:', `"${spokenCommand}" — Say "play" to continue`);
                 }
                 this.speech.speak('I did not understand that command. Please try again.');
             }
