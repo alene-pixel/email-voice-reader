@@ -2169,7 +2169,7 @@
                     {
                         id: 'cancel', icon: '✗', label: 'Cancel',
                         voiceMatch: (cmd) => cmd.includes('cancel'),
-                        isAvailable: () => ['confirming-send', 'confirming-forward-recipient'].includes(m.state),
+                        isAvailable: () => ['confirming-reply-type', 'confirming-send', 'confirming-forward-recipient'].includes(m.state),
                         execute: () => this.resolvePending('cancel')
                     }
                 ];
@@ -2789,6 +2789,12 @@
                         this.speech.speak('This email has other recipients. Say Reply to Sender Only, or Reply All to respond to everyone.');
 
                         const response = await this.waitForResponse();
+                        if (response === 'cancel') {
+                            this.model.setState('idle');
+                            this.view.updateStatus('Waiting for command');
+                            this.speech.speak('Reply cancelled. What would you like to do with this email?');
+                            return;
+                        }
                         isReplyAll = response.includes('all');
                     }
                 }
