@@ -2577,6 +2577,11 @@
                 if (this.speech.canResume) {
                     this.model.setState('reading');
                     this.view.updateStatus('Continuing email...');
+                    setTimeout(() => {
+                        if (this.model.state === 'reading') {
+                            this.view.updateStatus('Reading email aloud...');
+                        }
+                    }, 1000);
                     await this.speech.resume();
                     // After resume finishes (or is interrupted again), update state
                     if (!this.speech.isCancelled) {
@@ -2601,6 +2606,11 @@
                     // Jump succeeded — resume reading from new position
                     this.model.setState('reading');
                     this.view.updateStatus('Leaping...');
+                    setTimeout(() => {
+                        if (this.model.state === 'reading') {
+                            this.view.updateStatus('Reading email aloud...');
+                        }
+                    }, 1000);
                     await this.speech.resume();
                     if (!this.speech.isCancelled) {
                         this.model.setState('idle');
@@ -2613,6 +2623,11 @@
                 this.speech.skipBack(3);
                 this.model.setState('reading');
                 this.view.updateStatus('Rewinding...');
+                setTimeout(() => {
+                    if (this.model.state === 'reading') {
+                        this.view.updateStatus('Reading email aloud...');
+                    }
+                }, 1000);
                 await this.speech.resume();
                 if (!this.speech.isCancelled) {
                     this.model.setState('idle');
