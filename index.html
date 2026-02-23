@@ -3163,9 +3163,6 @@
                     return;
                 }
 
-                // Reset leap flag at the start of a new attachment-reading session
-                this.attachmentLeapInProgress = false;
-
                 // Set state so Stop button appears and Read Attachments button hides
                 this.model.setState('reading-attachment');
                 this.view.updateStatus('Reading attachments...');
@@ -3177,21 +3174,10 @@
                         return;
                     }
 
-                    // Check if leap/retreat took over — they handle the rest
-                    if (this.attachmentLeapInProgress) {
-                        return;
-                    }
-
                     const attachment = readableAttachments[i];
                     const position = readableAttachments.length > 1 ? `Attachment ${i + 1} of ${readableAttachments.length}. ` : '';
 
                     await this.speech.speak(`${position}Reading ${attachment.filename}. Please wait while I extract the text.`);
-
-                    // Check if leap/retreat took over during the intro
-                    if (this.attachmentLeapInProgress) {
-                        return;
-                    }
-
                     this.view.updateStatus(`Reading ${attachment.filename}...`);
 
                     const result = await this.gmail.extractAttachmentText(
@@ -3205,26 +3191,11 @@
                         return;
                     }
 
-                    // Check if leap/retreat took over during extraction
-                    if (this.attachmentLeapInProgress) {
-                        return;
-                    }
-
                     if (result.success) {
                         const textToRead = result.text;
                         await this.speech.speak(`Content of ${attachment.filename}: ${textToRead}`);
-
-                        // Check if leap/retreat took over during content reading
-                        if (this.attachmentLeapInProgress) {
-                            return;
-                        }
                     } else {
                         await this.speech.speak(`Sorry, I could not read ${attachment.filename}. ${result.error}`);
-
-                        // Check if leap/retreat took over during error message
-                        if (this.attachmentLeapInProgress) {
-                            return;
-                        }
                     }
                 }
 
