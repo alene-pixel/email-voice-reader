@@ -613,6 +613,7 @@
 
             setCurrentEmailIndex(index) {
                 this.currentEmailIndex = index;
+                this.attachmentDisplayText = null;
                 this.notify();
             }
 
@@ -905,6 +906,12 @@
                 if (totalDistance <= 0) return;
 
                 el.scrollTop = progress * totalDistance;
+            }
+
+            // Replace emailBody content with plain text (used for attachment display)
+            setEmailBodyText(text) {
+                this.elements.emailBody.textContent = text;
+                this.elements.emailBody.scrollTop = 0;
             }
         }
 
@@ -2374,6 +2381,11 @@
                     // Show attachments if any
                     const attachments = EmailUtils.getAttachments(m.currentEmail);
                     this.view.showAttachments(attachments);
+
+                    // If reading attachments, override body display with attachment text
+                    if (m.attachmentDisplayText !== null) {
+                        this.view.setEmailBodyText(m.attachmentDisplayText);
+                    }
                 } else {
                     this.view.hideEmail();
                     this.view.hideAttachments();
@@ -2578,18 +2590,29 @@
 
             async continueReading() {
                 if (this.speech.canResume) {
-                    this.model.setState('reading');
-                    this.view.updateStatus('Continuing email...');
+                    const isAttachment = this.model.attachmentDisplayText !== null;
+                    const readingState = isAttachment ? 'reading-attachment' : 'reading';
+                    const continuingMsg = isAttachment ? 'Continuing attachment...' : 'Continuing email...';
+                    const statusMsg = isAttachment ? 'Reading attachments...' : 'Reading email aloud...';
+
+                    this.model.setState(readingState);
+                    this.view.updateStatus(continuingMsg);
                     setTimeout(() => {
-                        if (this.model.state === 'reading') {
-                            this.view.updateStatus('Reading email aloud...');
+                        if (this.model.state === readingState) {
+                            this.view.updateStatus(statusMsg);
                         }
                     }, 1000);
                     await this.speech.resume();
                     // After resume finishes (or is interrupted again), update state
                     if (!this.speech.isCancelled) {
+                        if (isAttachment) {
+                            this.model.attachmentDisplayText = null;
+                            this.view.updateStatus('Finished reading attachments');
+                            await this.speech.speak('Finished reading attachments. What would you like to do with this email?');
+                        } else {
+                            this.view.updateStatus('Finished reading', 'What would you like to do with this email?');
+                        }
                         this.model.setState('idle');
-                        this.view.updateStatus('Finished reading', 'What would you like to do with this email?');
                     }
                 } else if (this.model.hasEmail) {
                     // No resume state but we have an email - restart from beginning
@@ -2601,44 +2624,75 @@
             }
 
             async handleSkipForward() {
+                const isAttachment = this.model.state === 'reading-attachment' || this.model.attachmentDisplayText !== null;
                 const result = this.speech.skipForward(3);
+
                 if (result === 'past-end') {
-                    // Past the end of the email — move to next email
-                    this.nextEmail();
+                    if (isAttachment) {
+                        // Past the end of attachments — finish attachment reading
+                        this.model.attachmentDisplayText = null;
+                        this.view.updateStatus('Finished reading attachments');
+                        await this.speech.speak('Finished reading attachments. What would you like to do with this email?');
+                        this.model.setState('idle');
+                    } else {
+                        // Past the end of the email — move to next email
+                        this.nextEmail();
+                    }
                 } else {
                     // Jump succeeded — resume reading from new position
-                    this.model.setState('reading');
+                    const readingState = isAttachment ? 'reading-attachment' : 'reading';
+                    const statusMsg = isAttachment ? 'Reading attachments...' : 'Reading email aloud...';
+
+                    this.model.setState(readingState);
                     this.view.updateStatus('Leaping...');
                     setTimeout(() => {
-                        if (this.model.state === 'reading') {
-                            this.view.updateStatus('Reading email aloud...');
+                        if (this.model.state === readingState) {
+                            this.view.updateStatus(statusMsg);
                         }
                     }, 1000);
                     await this.speech.resume();
                     if (!this.speech.isCancelled) {
+                        if (isAttachment) {
+                            this.model.attachmentDisplayText = null;
+                            this.view.updateStatus('Finished reading attachments');
+                            await this.speech.speak('Finished reading attachments. What would you like to do with this email?');
+                        } else {
+                            this.view.updateStatus('Finished reading', 'What would you like to do with this email?');
+                        }
                         this.model.setState('idle');
-                        this.view.updateStatus('Finished reading', 'What would you like to do with this email?');
                     }
                 }
             }
 
             async handleSkipBack() {
+                const isAttachment = this.model.state === 'reading-attachment' || this.model.attachmentDisplayText !== null;
                 this.speech.skipBack(3);
-                this.model.setState('reading');
+
+                const readingState = isAttachment ? 'reading-attachment' : 'reading';
+                const statusMsg = isAttachment ? 'Reading attachments...' : 'Reading email aloud...';
+
+                this.model.setState(readingState);
                 this.view.updateStatus('Rewinding...');
                 setTimeout(() => {
-                    if (this.model.state === 'reading') {
-                        this.view.updateStatus('Reading email aloud...');
+                    if (this.model.state === readingState) {
+                        this.view.updateStatus(statusMsg);
                     }
                 }, 1000);
                 await this.speech.resume();
                 if (!this.speech.isCancelled) {
+                    if (isAttachment) {
+                        this.model.attachmentDisplayText = null;
+                        this.view.updateStatus('Finished reading attachments');
+                        await this.speech.speak('Finished reading attachments. What would you like to do with this email?');
+                    } else {
+                        this.view.updateStatus('Finished reading', 'What would you like to do with this email?');
+                    }
                     this.model.setState('idle');
-                    this.view.updateStatus('Finished reading', 'What would you like to do with this email?');
                 }
             }
 
             async readCurrentEmail() {
+                this.model.attachmentDisplayText = null;
                 const email = this.model.currentEmail;
                 if (!email) {
                     await this.checkForMoreEmails();
@@ -3168,43 +3222,81 @@
 
                 // Set state so Stop button appears and Read Attachments button hides
                 this.model.setState('reading-attachment');
-                this.view.updateStatus('Reading attachments...');
+                this.view.updateStatus('Extracting attachment text...');
+
+                // Phase 1: Announce and extract all attachment text up front
+                if (readableAttachments.length === 1) {
+                    await this.speech.speak(`Reading ${readableAttachments[0].filename}. Please wait while I extract the text.`);
+                } else {
+                    await this.speech.speak(`Reading ${readableAttachments.length} attachments. Please wait while I extract the text.`);
+                }
+
+                // Check if user stopped during announcement
+                if (this.model.state !== 'reading-attachment') {
+                    this.view.updateStatus('Stopped reading attachments');
+                    return;
+                }
+
+                let combinedText = '';
+                let successCount = 0;
 
                 for (let i = 0; i < readableAttachments.length; i++) {
-                    // Check if user said "Stop" (state would change from 'reading-attachment')
                     if (this.model.state !== 'reading-attachment') {
                         this.view.updateStatus('Stopped reading attachments');
                         return;
                     }
 
                     const attachment = readableAttachments[i];
-                    const position = readableAttachments.length > 1 ? `Attachment ${i + 1} of ${readableAttachments.length}. ` : '';
-
-                    await this.speech.speak(`${position}Reading ${attachment.filename}. Please wait while I extract the text.`);
-                    this.view.updateStatus(`Reading ${attachment.filename}...`);
+                    this.view.updateStatus(`Extracting ${attachment.filename}...`);
 
                     const result = await this.gmail.extractAttachmentText(
                         this.model.currentEmail.id,
                         attachment
                     );
 
-                    // Check again after extraction in case user said "Stop" during the wait
-                    if (this.model.state !== 'reading-attachment') {
-                        this.view.updateStatus('Stopped reading attachments');
-                        return;
-                    }
-
                     if (result.success) {
-                        const textToRead = result.text;
-                        await this.speech.speak(`Content of ${attachment.filename}: ${textToRead}`);
+                        const header = readableAttachments.length > 1
+                            ? `Attachment ${i + 1} of ${readableAttachments.length}: ${attachment.filename}.\n\n`
+                            : `${attachment.filename}.\n\n`;
+                        combinedText += header + result.text + '\n\n';
+                        successCount++;
                     } else {
-                        await this.speech.speak(`Sorry, I could not read ${attachment.filename}. ${result.error}`);
+                        const header = readableAttachments.length > 1
+                            ? `Attachment ${i + 1} of ${readableAttachments.length}: ${attachment.filename}.\n\n`
+                            : `${attachment.filename}.\n\n`;
+                        combinedText += header + `Sorry, I could not read this attachment. ${result.error}\n\n`;
                     }
                 }
 
-                this.view.updateStatus('Finished reading attachments');
-                await this.speech.speak('Finished reading attachments. What would you like to do with this email?');
-                this.model.setState('idle');
+                // Check if user stopped during extraction
+                if (this.model.state !== 'reading-attachment') {
+                    this.view.updateStatus('Stopped reading attachments');
+                    return;
+                }
+
+                if (successCount === 0) {
+                    await this.speech.speak('Sorry, I could not read any of the attachments.');
+                    this.model.setState('idle');
+                    return;
+                }
+
+                // Phase 2: Display attachment text on screen
+                combinedText = combinedText.trim();
+                this.model.attachmentDisplayText = combinedText;
+                this.view.setEmailBodyText(combinedText);
+
+                // Phase 3: Read with speakWithScroll for leap/retreat support
+                this.view.updateStatus('Reading attachments...');
+                const textForSpeech = EmailUtils.stripUrlsForSpeech(combinedText);
+                await this.speech.speakWithScroll(textForSpeech, this.view, 0);
+
+                // Phase 4: Clean up (only if finished naturally, not cancelled)
+                if (!this.speech.isCancelled) {
+                    this.model.attachmentDisplayText = null;
+                    this.view.updateStatus('Finished reading attachments');
+                    await this.speech.speak('Finished reading attachments. What would you like to do with this email?');
+                    this.model.setState('idle');
+                }
             }
         }
 
