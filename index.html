@@ -2005,10 +2005,6 @@
                 this.dictationTimeout = null;
                 this.dictationSilenceTimeout = null;
 
-                // Flag: when leap/retreat fires during attachment reading,
-                // this tells readAttachments() to stop — the skip handler takes over
-                this.attachmentLeapInProgress = false;
-
                 // Wire up speech recognition
                 this.speech.onCommand = (cmd) => this.handleCommand(cmd);
 
@@ -2602,34 +2598,8 @@
             }
 
             async handleSkipForward() {
-                const wasReadingAttachment = this.model.state === 'reading-attachment';
                 const result = this.speech.skipForward(3);
-
-                if (wasReadingAttachment) {
-                    // Tell readAttachments() to stop — we're taking over
-                    this.attachmentLeapInProgress = true;
-
-                    if (result === 'past-end') {
-                        // Past the end of the attachment — finish attachment reading
-                        this.model.setState('idle');
-                        this.view.updateStatus('Finished reading attachments');
-                        await this.speech.speak('Finished reading attachments. What would you like to do with this email?');
-                    } else {
-                        // Jump succeeded — resume reading attachment from new position
-                        this.view.updateStatus('Leaping...');
-                        setTimeout(() => {
-                            if (this.model.state === 'reading-attachment') {
-                                this.view.updateStatus('Reading attachment...');
-                            }
-                        }, 1000);
-                        await this.speech.resume();
-                        if (!this.speech.isCancelled) {
-                            this.model.setState('idle');
-                            this.view.updateStatus('Finished reading attachments');
-                            await this.speech.speak('Finished reading attachments. What would you like to do with this email?');
-                        }
-                    }
-                } else if (result === 'past-end') {
+                if (result === 'past-end') {
                     // Past the end of the email — move to next email
                     this.nextEmail();
                 } else {
@@ -2650,38 +2620,18 @@
             }
 
             async handleSkipBack() {
-                const wasReadingAttachment = this.model.state === 'reading-attachment';
                 this.speech.skipBack(3);
-
-                if (wasReadingAttachment) {
-                    // Tell readAttachments() to stop — we're taking over
-                    this.attachmentLeapInProgress = true;
-
-                    this.view.updateStatus('Rewinding...');
-                    setTimeout(() => {
-                        if (this.model.state === 'reading-attachment') {
-                            this.view.updateStatus('Reading attachment...');
-                        }
-                    }, 1000);
-                    await this.speech.resume();
-                    if (!this.speech.isCancelled) {
-                        this.model.setState('idle');
-                        this.view.updateStatus('Finished reading attachments');
-                        await this.speech.speak('Finished reading attachments. What would you like to do with this email?');
+                this.model.setState('reading');
+                this.view.updateStatus('Rewinding...');
+                setTimeout(() => {
+                    if (this.model.state === 'reading') {
+                        this.view.updateStatus('Reading email aloud...');
                     }
-                } else {
-                    this.model.setState('reading');
-                    this.view.updateStatus('Rewinding...');
-                    setTimeout(() => {
-                        if (this.model.state === 'reading') {
-                            this.view.updateStatus('Reading email aloud...');
-                        }
-                    }, 1000);
-                    await this.speech.resume();
-                    if (!this.speech.isCancelled) {
-                        this.model.setState('idle');
-                        this.view.updateStatus('Finished reading', 'What would you like to do with this email?');
-                    }
+                }, 1000);
+                await this.speech.resume();
+                if (!this.speech.isCancelled) {
+                    this.model.setState('idle');
+                    this.view.updateStatus('Finished reading', 'What would you like to do with this email?');
                 }
             }
 
