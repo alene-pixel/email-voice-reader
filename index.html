@@ -2295,8 +2295,8 @@
                 }
 
                 // No match
-                // If we were reading, change state to idle so Continue button appears
-                if (this.model.state === 'reading' && this.model.hasEmail) {
+                // If we were reading (email or attachment), change state to idle so Play button appears
+                if (['reading', 'reading-attachment'].includes(this.model.state) && this.model.hasEmail) {
                     this.model.setState('idle');
                     this.view.updateStatus('I heard you say:', `"${spokenCommand}" — Say "play" to continue`);
                 }
