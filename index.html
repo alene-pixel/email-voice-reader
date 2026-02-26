@@ -1759,11 +1759,14 @@
                                     .map(addr => addr.trim())
                                     .filter(addr => addr && !addr.toLowerCase().includes(myEmail.toLowerCase()))
                                     .filter(addr => {
-                                        // Skip unsubscribe emails
                                         const emailMatch = addr.match(/<([^>]+)>/);
                                         const emailAddr = (emailMatch ? emailMatch[1] : addr).toLowerCase();
+                                        // Skip unsubscribe emails
                                         if (emailAddr.includes('unsubscribe')) return false;
                                         if (emailAddr.startsWith('unsub')) return false;
+                                        // Skip auto-generated/tracking addresses (long random local parts)
+                                        const localPart = emailAddr.split('@')[0];
+                                        if (localPart.length > 25) return false;
                                         return true;
                                     })
                                     .forEach(addr => {
