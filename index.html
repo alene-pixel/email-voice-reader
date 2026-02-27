@@ -2062,7 +2062,7 @@
                     },
                     {
                         id: 'reply', icon: '↩️', label: 'Reply',
-                        voiceMatch: (cmd) => cmd.includes('respond') || cmd.includes('reply'),
+                        voiceMatch: (cmd) => cmd.includes('respond') || cmd.includes('reply') || cmd.includes('apply'),
                         isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
                         execute: () => this.handleReply()
                     },
