@@ -508,28 +508,6 @@
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-    <!-- ============================================================
-         TODO: TEMPORARY - REMOVE WHEN APP IS FINALIZED
-         This script prevents cookies from persisting between sessions.
-         During active development, this saves Alene from having to
-         manually clear cookies after each code change.
-         When the app is complete, DELETE this entire script block.
-         ============================================================ -->
-    <script>
-    (function clearAllCookiesOnLoad() {
-        // Clear all cookies for this domain on every page load
-        document.cookie.split(';').forEach(function(cookie) {
-            var name = cookie.split('=')[0].trim();
-            if (name) {
-                document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
-                document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=' + location.hostname;
-                document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=.' + location.hostname;
-            }
-        });
-        // Also clear any storage that might cache state
-        try { sessionStorage.clear(); } catch(e) {}
-    })();
-    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <script>
@@ -1848,12 +1826,7 @@
                 try {
                     google.accounts.id.initialize({
                         client_id: this.model.clientId,
-                        callback: () => {},
-                        // TODO: TEMPORARY - REMOVE WHEN APP IS FINALIZED
-                        // These settings prevent Google from storing persistent
-                        // cookies, so Alene doesn't have to clear them during development.
-                        auto_select: false,
-                        use_fedcm_for_prompt: false
+                        callback: () => {}
                     });
 
                     const tokenClient = google.accounts.oauth2.initTokenClient({
