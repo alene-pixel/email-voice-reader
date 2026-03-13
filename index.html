@@ -456,6 +456,38 @@
                 opacity: 0.8;
             }
         }
+
+        /* Mic device picker */
+        .mic-picker-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            color: #888;
+        }
+
+        .mic-picker-row select {
+            flex: 1;
+            max-width: 260px;
+            padding: 5px 8px;
+            border: 1.5px solid #C9A7EB;
+            border-radius: 8px;
+            background: white;
+            color: #5A3E8A;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .mic-picker-row select:focus {
+            outline: none;
+            border-color: #FF6B9D;
+            box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.2);
+        }
+
+        .mic-picker-row.hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -477,6 +509,11 @@
             <div class="status">
                 <div class="status-text" id="statusText">Ready to start</div>
                 <div class="status-detail" id="statusDetail">Click or say "Start Reading Emails" to begin</div>
+            </div>
+
+            <div id="micPickerRow" class="mic-picker-row hidden">
+                <span>🎤</span>
+                <select id="micSelect" title="Choose microphone"></select>
             </div>
 
             <div id="dictationDisplay" class="dictation-display hidden">
@@ -1197,6 +1234,8 @@
                 this.currentUtterance = null;
                 this.onCommand = null; // Callback when voice command is heard
                 this.allowAutoRestart = false; // Enable auto-restart only after welcome flow is complete
+                this.selectedDeviceId = localStorage.getItem('voiceEmailMicDeviceId') || 'default';
+                this.activeMicStream = null; // getUserMedia stream held open to nudge Chrome mic routing
                 this.isCancelled = false; // Track cancellation for chunked speech
                 this.speechGeneration = 0; // Increments each time new speech starts, to invalidate old async loops
 
@@ -1270,6 +1309,80 @@
                     }
                 }
                 return false;
+            }
+
+            // Set the active microphone device. Holds a getUserMedia stream on the chosen
+            // device, which nudges Chrome's SpeechRecognition to use the same mic.
+            async setMicDevice(deviceId) {
+                this.selectedDeviceId = deviceId;
+                if (deviceId === 'default') {
+                    localStorage.removeItem('voiceEmailMicDeviceId');
+                } else {
+                    localStorage.setItem('voiceEmailMicDeviceId', deviceId);
+                }
+                // Release old stream
+                if (this.activeMicStream) {
+                    this.activeMicStream.getTracks().forEach(t => t.stop());
+                    this.activeMicStream = null;
+                }
+                // Claim the selected device to influence Chrome's SpeechRecognition routing
+                if (deviceId && deviceId !== 'default') {
+                    try {
+                        this.activeMicStream = await navigator.mediaDevices.getUserMedia({
+                            audio: { deviceId: { exact: deviceId } }
+                        });
+                        console.log('Mic stream claimed:', deviceId);
+                    } catch (e) {
+                        console.warn('Could not claim mic device:', e);
+                    }
+                }
+            }
+
+            // Enumerate audio input devices and populate the given <select> element.
+            // Only reveals the picker row if more than one microphone is available.
+            async populateMicPicker(selectEl, rowEl) {
+                try {
+                    // Request mic permission first so device labels are populated
+                    const permStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    permStream.getTracks().forEach(t => t.stop());
+                } catch (e) {
+                    return; // Permission denied or not supported
+                }
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const mics = devices.filter(d => d.kind === 'audioinput' && d.deviceId !== 'communications');
+                    if (mics.length <= 1) return; // Only show picker if there's a real choice
+
+                    selectEl.innerHTML = '';
+                    const defaultOpt = document.createElement('option');
+                    defaultOpt.value = 'default';
+                    defaultOpt.textContent = 'System Default';
+                    selectEl.appendChild(defaultOpt);
+
+                    mics.forEach(mic => {
+                        if (mic.deviceId === 'default') return;
+                        const opt = document.createElement('option');
+                        opt.value = mic.deviceId;
+                        opt.textContent = mic.label || `Microphone ${mic.deviceId.slice(0, 8)}`;
+                        selectEl.appendChild(opt);
+                    });
+
+                    // Restore saved selection
+                    const saved = this.selectedDeviceId;
+                    if (saved) {
+                        const matchingOpt = Array.from(selectEl.options).find(o => o.value === saved);
+                        if (matchingOpt) selectEl.value = saved;
+                    }
+
+                    rowEl.classList.remove('hidden');
+
+                    // Claim the saved device if not default
+                    if (saved && saved !== 'default') {
+                        await this.setMicDevice(saved);
+                    }
+                } catch (e) {
+                    console.warn('Could not enumerate mic devices:', e);
+                }
             }
 
             // Wake lock keeps the screen on while the app is reading
@@ -2452,6 +2565,22 @@
                 }
             }
 
+            // ========== MIC PICKER ==========
+            async initMicPicker() {
+                const selectEl = document.getElementById('micSelect');
+                const rowEl = document.getElementById('micPickerRow');
+                if (!selectEl || !rowEl) return;
+                await this.speech.populateMicPicker(selectEl, rowEl);
+                selectEl.addEventListener('change', async () => {
+                    await this.speech.setMicDevice(selectEl.value);
+                    // Restart listening so SpeechRecognition picks up the new device
+                    if (this.speech.allowAutoRestart && this.speech.recognition) {
+                        try { this.speech.recognition.stop(); } catch (e) {}
+                        setTimeout(() => this.speech.startListening(), 300);
+                    }
+                });
+            }
+
             // ========== INITIALIZATION ==========
             init() {
                 // Set up welcome screen click handler
@@ -2520,6 +2649,7 @@
                         this.speech.startListening();
                         this.speech.speak('Sorry, I had trouble fetching your emails. Please try again.');
                     }
+                    this.initMicPicker();
                 });
             }
 
