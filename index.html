@@ -488,6 +488,13 @@
         .mic-picker-row.hidden {
             display: none;
         }
+
+        #welcomeScreen .mic-picker-row {
+            color: rgba(255, 255, 255, 0.9);
+            justify-content: center;
+            margin-top: 20px;
+            margin-bottom: 0;
+        }
     </style>
 </head>
 <body>
@@ -496,6 +503,10 @@
         <div class="welcome-content">
             <div class="welcome-text">
                 <div class="welcome-cta">Tap anywhere to hear your emails.</div>
+            </div>
+            <div id="micPickerRow" class="mic-picker-row hidden">
+                <span>🎤</span>
+                <select id="micSelect" title="Choose microphone"></select>
             </div>
         </div>
     </div>
@@ -509,11 +520,6 @@
             <div class="status">
                 <div class="status-text" id="statusText">Ready to start</div>
                 <div class="status-detail" id="statusDetail">Click or say "Start Reading Emails" to begin</div>
-            </div>
-
-            <div id="micPickerRow" class="mic-picker-row hidden">
-                <span>🎤</span>
-                <select id="micSelect" title="Choose microphone"></select>
             </div>
 
             <div id="dictationDisplay" class="dictation-display hidden">
@@ -2570,6 +2576,9 @@
                 const selectEl = document.getElementById('micSelect');
                 const rowEl = document.getElementById('micPickerRow');
                 if (!selectEl || !rowEl) return;
+                // Stop clicks/touches on the mic row from dismissing the welcome screen
+                rowEl.addEventListener('click', (e) => e.stopPropagation());
+                rowEl.addEventListener('touchend', (e) => e.stopPropagation());
                 await this.speech.populateMicPicker(selectEl, rowEl);
                 selectEl.addEventListener('change', async () => {
                     await this.speech.setMicDevice(selectEl.value);
@@ -2597,6 +2606,8 @@
                         await this.gmail.getMyEmail();
                         // Show welcome screen (requires tap to enable audio on iOS)
                         this.model.setState('welcome');
+                        // Populate mic picker in the background while welcome screen is visible
+                        this.initMicPicker();
                     },
                     (errorMsg) => {
                         // OAuth failed - show error on welcome screen
@@ -2649,7 +2660,6 @@
                         this.speech.startListening();
                         this.speech.speak('Sorry, I had trouble fetching your emails. Please try again.');
                     }
-                    this.initMicPicker();
                 });
             }
 
