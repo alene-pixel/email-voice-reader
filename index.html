@@ -2537,7 +2537,7 @@
                         this.model.dictatedText = text;
                         this.finishDictation();
                     }
-                }, 4000);
+                }, 10000);
             }
 
             // Start a 30-second silence timeout that cancels dictation if nothing is said or typed
@@ -2554,7 +2554,7 @@
                             this.cancelDictation();
                         }
                     }
-                }, 30000);
+                }, 60000);
             }
 
             clearDictationSilenceTimeout() {
