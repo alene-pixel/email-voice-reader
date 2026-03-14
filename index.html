@@ -1590,13 +1590,15 @@
 
                 // Speak all sentences sequentially with synchronized scrolling
                 for (let i = 0; i < sentences.length; i++) {
+                    // Check cancellation FIRST, before updating any shared state
+                    // (prevents race condition where a leap's jumpToSentence sets new
+                    // values but this old loop overwrites them before exiting)
+                    if (this.isCancelled || myGeneration !== this.speechGeneration) break;
+
                     // Track current position for resume
                     this.currentSentenceIndex = i;
                     this.absoluteSentenceIndex = i;
                     this.charactersSpoken = charactersSpoken;
-
-                    // Check both flag and generation
-                    if (this.isCancelled || myGeneration !== this.speechGeneration) break;
 
                     // Only scroll after passing the threshold (header + buffer)
                     if (charactersSpoken >= scrollStartThreshold && scrollableCharacters > 0) {
@@ -1663,11 +1665,14 @@
 
                 // Speak remaining sentences sequentially with synchronized scrolling
                 for (let i = 0; i < sentences.length; i++) {
+                    // Check cancellation FIRST, before updating any shared state
+                    // (prevents race condition where a leap's jumpToSentence sets new
+                    // values but this old loop overwrites them before exiting)
+                    if (this.isCancelled || myGeneration !== this.speechGeneration) break;
+
                     this.currentSentenceIndex = i;
                     if (i > 0) this.absoluteSentenceIndex++;
                     this.charactersSpoken = charactersSpoken;
-
-                    if (this.isCancelled || myGeneration !== this.speechGeneration) break;
 
                     // Only scroll after passing the threshold (header + buffer)
                     if (view && charactersSpoken >= scrollStartThreshold && scrollableCharacters > 0) {
