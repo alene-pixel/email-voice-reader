@@ -2192,7 +2192,7 @@
                     },
                     {
                         id: 'leap', icon: '🏃🏿‍♀️‍➡️', label: 'Leap',
-                        voiceMatch: (cmd) => cmd.includes('leap') || cmd.includes('lee') || cmd.includes('leak') || cmd.includes('leaf'),
+                        voiceMatch: (cmd) => cmd.includes('leap') || cmd.includes('lee') || cmd.includes('leak') || cmd.includes('leaf') || cmd.includes('leave'),
                         isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
                         execute: () => this.handleSkipForward()
                     },
