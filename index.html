@@ -400,7 +400,6 @@
             justify-content: center;
             align-items: center;
             z-index: 1000;
-            cursor: pointer;
         }
 
         #welcomeScreen.hidden {
@@ -457,56 +456,66 @@
             }
         }
 
-        /* Mic device picker */
-        .mic-picker-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 15px;
-            font-size: 13px;
-            color: #888;
-        }
-
-        .mic-picker-row select {
-            flex: 1;
-            max-width: 260px;
-            padding: 5px 8px;
-            border: 1.5px solid #C9A7EB;
-            border-radius: 8px;
-            background: white;
-            color: #5A3E8A;
-            font-size: 12px;
-            cursor: pointer;
-        }
-
-        .mic-picker-row select:focus {
-            outline: none;
-            border-color: #FF6B9D;
-            box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.2);
-        }
-
-        .mic-picker-row.hidden {
-            display: none;
-        }
-
-        #welcomeScreen .mic-picker-row {
+        /* Welcome screen subtitle */
+        .welcome-subtitle {
+            font-size: 18px;
             color: rgba(255, 255, 255, 0.9);
-            justify-content: center;
-            margin-top: 20px;
-            margin-bottom: 0;
+            font-weight: 400;
+            margin-top: 8px;
+        }
+
+        /* Mic selection buttons on welcome screen */
+        .mic-buttons-container {
+            margin-top: 32px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .mic-btn {
+            background: rgba(255, 255, 255, 0.25);
+            border: 2px solid rgba(255, 255, 255, 0.75);
+            border-radius: 30px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            padding: 13px 32px;
+            cursor: pointer;
+            min-width: 260px;
+            max-width: 360px;
+            transition: background 0.18s, transform 0.1s;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+            font-family: inherit;
+        }
+
+        .mic-btn:hover {
+            background: rgba(255, 255, 255, 0.42);
+            transform: scale(1.03);
+        }
+
+        .mic-btn:active {
+            transform: scale(0.97);
+        }
+
+        .mic-loading {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 15px;
+            font-style: italic;
+            margin-top: 8px;
         }
     </style>
 </head>
 <body>
-    <!-- Welcome Screen - appears after Gmail auth to enable iOS audio -->
+    <!-- Welcome Screen - appears after Gmail auth; mic button click also unlocks iOS audio -->
     <div id="welcomeScreen">
         <div class="welcome-content">
             <div class="welcome-text">
-                <div class="welcome-cta">Tap anywhere to hear your emails.</div>
+                <div class="welcome-cta">Welcome!</div>
+                <div class="welcome-subtitle">Select your microphone to begin.</div>
             </div>
-            <div id="micPickerRow" class="mic-picker-row hidden">
-                <span>🎤</span>
-                <select id="micSelect" title="Choose microphone"></select>
+            <div id="micButtonsContainer" class="mic-buttons-container">
+                <div class="mic-loading">Detecting microphones…</div>
             </div>
         </div>
     </div>
@@ -2571,34 +2580,67 @@
                 }
             }
 
-            // ========== MIC PICKER ==========
+            // ========== MIC BUTTONS ==========
             async initMicPicker() {
-                const selectEl = document.getElementById('micSelect');
-                const rowEl = document.getElementById('micPickerRow');
-                if (!selectEl || !rowEl) return;
-                // Stop clicks/touches on the mic row from dismissing the welcome screen
-                rowEl.addEventListener('click', (e) => e.stopPropagation());
-                rowEl.addEventListener('touchend', (e) => e.stopPropagation());
-                await this.speech.populateMicPicker(selectEl, rowEl);
-                selectEl.addEventListener('change', async () => {
-                    await this.speech.setMicDevice(selectEl.value);
-                    // Restart listening so SpeechRecognition picks up the new device
-                    if (this.speech.allowAutoRestart && this.speech.recognition) {
-                        try { this.speech.recognition.stop(); } catch (e) {}
-                        setTimeout(() => this.speech.startListening(), 300);
+                const container = document.getElementById('micButtonsContainer');
+                if (!container) return;
+                await this.buildMicButtons(container);
+            }
+
+            async buildMicButtons(container) {
+                // Request mic permission so device labels are available
+                try {
+                    const permStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    permStream.getTracks().forEach(t => t.stop());
+                } catch (e) {
+                    // Permission denied — show a single Continue button with no device selection
+                    container.innerHTML = '';
+                    const btn = this.makeMicBtn('🎤 Continue', () => this.onMicSelected('default'));
+                    container.appendChild(btn);
+                    return;
+                }
+
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    // Exclude the virtual "communications" alias; keep named mics + any 'default' entry
+                    const mics = devices.filter(d =>
+                        d.kind === 'audioinput' && d.deviceId !== 'communications'
+                    );
+
+                    container.innerHTML = '';
+
+                    if (mics.length === 0) {
+                        const btn = this.makeMicBtn('🎤 Continue', () => this.onMicSelected('default'));
+                        container.appendChild(btn);
+                        return;
                     }
-                });
+
+                    mics.forEach(mic => {
+                        const label = mic.deviceId === 'default'
+                            ? 'System Default'
+                            : (mic.label || `Microphone ${mic.deviceId.slice(0, 8)}`);
+                        const btn = this.makeMicBtn('🎤 ' + label, () => this.onMicSelected(mic.deviceId));
+                        container.appendChild(btn);
+                    });
+                } catch (e) {
+                    console.warn('Could not enumerate mic devices:', e);
+                    container.innerHTML = '';
+                    const btn = this.makeMicBtn('🎤 Continue', () => this.onMicSelected('default'));
+                    container.appendChild(btn);
+                }
+            }
+
+            makeMicBtn(label, onClick) {
+                const btn = document.createElement('button');
+                btn.className = 'mic-btn';
+                btn.textContent = label;
+                btn.addEventListener('click', onClick);
+                btn.addEventListener('touchend', (e) => { e.preventDefault(); onClick(); });
+                return btn;
             }
 
             // ========== INITIALIZATION ==========
             init() {
-                // Set up welcome screen click handler
-                this.view.elements.welcomeScreen.addEventListener('click', () => this.onWelcomeScreenTap());
-                this.view.elements.welcomeScreen.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    this.onWelcomeScreenTap();
-                });
-
                 // Start OAuth flow - Client ID is embedded in the app
                 this.gmail.initAuth(
                     async () => {
@@ -2621,10 +2663,10 @@
                 );
             }
 
-            // Handle tap on welcome screen - this user gesture enables iOS audio
-            // CRITICAL: The first speech.speak() call MUST be synchronous within this handler
-            // to unlock iOS audio. All async work happens AFTER the welcome message.
-            onWelcomeScreenTap() {
+            // Called when user clicks a mic button on the welcome screen.
+            // The button click IS the user gesture that unlocks iOS audio — speak() must be
+            // called synchronously here (no await before it).
+            onMicSelected(deviceId) {
                 if (this.model.state !== 'welcome') return;
 
                 // Update UI immediately
@@ -2634,6 +2676,10 @@
                 // CRITICAL: This synchronous speech.speak() call unlocks iOS audio.
                 // Do NOT add any await/async before this line!
                 this.speech.speak('Welcome to Voice Email Reader! Let me check your inbox.').then(async () => {
+                    // Claim the chosen mic before speech recognition starts
+                    if (deviceId && deviceId !== 'default') {
+                        await this.speech.setMicDevice(deviceId);
+                    }
                     try {
                         // Fetch emails
                         const emails = await this.gmail.fetchUnreadEmails();
