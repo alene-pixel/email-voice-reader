@@ -2651,6 +2651,12 @@
                     async () => {
                         // Pre-fetch user email so we can say "you" instead of their address
                         await this.gmail.getMyEmail();
+                        // Restore welcome text in case the timeout overwrote it with an error
+                        const ctaEl = document.querySelector('.welcome-cta');
+                        if (ctaEl) {
+                            ctaEl.innerHTML = 'Welcome!';
+                            ctaEl.style.fontSize = '';
+                        }
                         // Show welcome screen (requires tap to enable audio on iOS)
                         this.model.setState('welcome');
                         // Populate mic picker in the background while welcome screen is visible
