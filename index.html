@@ -1344,7 +1344,12 @@
                 if (deviceId && deviceId !== 'default') {
                     try {
                         this.activeMicStream = await navigator.mediaDevices.getUserMedia({
-                            audio: { deviceId: { exact: deviceId } }
+                            audio: {
+                                deviceId: { exact: deviceId },
+                                echoCancellation: true,
+                                noiseSuppression: true,
+                                autoGainControl: true
+                            }
                         });
                         console.log('Mic stream claimed:', deviceId);
                     } catch (e) {
