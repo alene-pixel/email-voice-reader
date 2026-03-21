@@ -3052,16 +3052,17 @@
                 this.model.isReplyAll = isReplyAll;
 
                 // Start dictation
-                this.model.userTouchedTextArea = false;
                 this.model.setState('dictating');
                 this.startDictationSilenceTimeout();
 
                 if (isEdit) {
+                    this.model.userTouchedTextArea = false;
                     // Preserve existing text for editing
                     this.view.updateStatus('Editing response', 'Speak to replace, or tap text to edit by hand');
                     this.view.showDictation(this.model.dictatedText, true);
                     this.speech.speak('Your previous message is shown. Speak to replace it, or tap the text to edit it by hand.');
                 } else {
+                    this.model.userTouchedTextArea = true;
                     this.model.dictatedText = '';
                     this.view.updateStatus('Listening for response', `Start speaking your reply`);
                     this.view.showDictation('', true);
@@ -3269,7 +3270,7 @@
                     if (wantsMessage.includes('yes')) {
                         // Get message via dictation
                         this.model.dictatedText = '';
-                        this.model.userTouchedTextArea = false;
+                        this.model.userTouchedTextArea = true;
                         this.model.setState('dictating');
                         this.startDictationSilenceTimeout();
                         this.view.updateStatus('Listening for message');
