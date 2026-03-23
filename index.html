@@ -3337,17 +3337,67 @@
                         htmlBody += `<pre>${rawBody.body}</pre>`;
                     }
 
-                    const emailParts = [
-                        `To: ${toAddress}`,
-                        `Subject: ${fwdSubject}`,
-                        `In-Reply-To: ${messageId}`,
-                        `References: ${references}`,
-                        'Content-Type: text/html; charset=UTF-8',
-                        '',
-                        htmlBody
-                    ];
+                    // Check for attachments to include
+                    const attachments = EmailUtils.getAttachments(email);
+                    let rawEmail;
 
-                    await this.gmail.sendEmail(emailParts.join('\n'), email.threadId);
+                    if (attachments.length > 0) {
+                        // Build multipart MIME message with attachments
+                        const boundary = 'boundary_' + Date.now() + '_' + Math.random().toString(36).substr(2);
+
+                        const headers = [
+                            `To: ${toAddress}`,
+                            `Subject: ${fwdSubject}`,
+                            `In-Reply-To: ${messageId}`,
+                            `References: ${references}`,
+                            'MIME-Version: 1.0',
+                            `Content-Type: multipart/mixed; boundary="${boundary}"`,
+                            '',
+                            `--${boundary}`,
+                            'Content-Type: text/html; charset=UTF-8',
+                            '',
+                            htmlBody
+                        ];
+
+                        // Fetch and attach each attachment
+                        for (const att of attachments) {
+                            try {
+                                const base64Data = await this.gmail.getAttachment(email.id, att.attachmentId);
+                                if (base64Data) {
+                                    // Gmail API returns url-safe base64; convert to standard base64 for MIME
+                                    const standardBase64 = base64Data.replace(/-/g, '+').replace(/_/g, '/');
+                                    // Split into 76-char lines per MIME spec
+                                    const wrapped = standardBase64.match(/.{1,76}/g)?.join('\n') || standardBase64;
+                                    headers.push(
+                                        `--${boundary}`,
+                                        `Content-Type: ${att.mimeType}; name="${att.filename}"`,
+                                        `Content-Disposition: attachment; filename="${att.filename}"`,
+                                        'Content-Transfer-Encoding: base64',
+                                        '',
+                                        wrapped
+                                    );
+                                }
+                            } catch (attErr) {
+                                console.warn('Could not attach file:', att.filename, attErr);
+                            }
+                        }
+
+                        headers.push(`--${boundary}--`);
+                        rawEmail = headers.join('\n');
+                    } else {
+                        // Simple email without attachments (original behavior)
+                        rawEmail = [
+                            `To: ${toAddress}`,
+                            `Subject: ${fwdSubject}`,
+                            `In-Reply-To: ${messageId}`,
+                            `References: ${references}`,
+                            'Content-Type: text/html; charset=UTF-8',
+                            '',
+                            htmlBody
+                        ].join('\n');
+                    }
+
+                    await this.gmail.sendEmail(rawEmail, email.threadId);
 
                     this.model.setState('idle');
                     this.view.updateStatus('Waiting for command');
