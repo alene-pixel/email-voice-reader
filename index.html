@@ -312,6 +312,14 @@
             cursor: not-allowed;
         }
 
+        .dictation-interim {
+            color: #9B7DC4;
+            font-style: italic;
+            font-size: 15px;
+            min-height: 20px;
+            padding: 4px 0;
+        }
+
         #buttonContainer {
             display: grid;
             grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -534,6 +542,7 @@
             <div id="dictationDisplay" class="dictation-display hidden">
                 <h3>✍️ Your Message:</h3>
                 <div id="dictationText" class="dictation-text" contenteditable="true"></div>
+                <div id="dictationInterim" class="dictation-interim"></div>
             </div>
 
             <div id="emailDisplay" class="email-display hidden">
@@ -687,6 +696,7 @@
                     emailBody: document.getElementById('emailBody'),
                     dictationDisplay: document.getElementById('dictationDisplay'),
                     dictationText: document.getElementById('dictationText'),
+                    dictationInterim: document.getElementById('dictationInterim'),
                     buttonContainer: document.getElementById('buttonContainer'),
                     commandsSection: document.getElementById('commandsSection'),
                     attachmentsDisplay: document.getElementById('attachmentsDisplay'),
@@ -846,6 +856,7 @@
 
             hideDictation() {
                 this.elements.dictationDisplay.classList.add('hidden');
+                this.clearInterimText();
             }
 
             getDictationText() {
@@ -859,6 +870,14 @@
             appendDictationText(text) {
                 const existing = this.getDictationText();
                 this.setDictationText(existing ? existing + ' ' + text : text);
+            }
+
+            showInterimText(text) {
+                this.elements.dictationInterim.textContent = text ? `... ${text}` : '';
+            }
+
+            clearInterimText() {
+                this.elements.dictationInterim.textContent = '';
             }
 
             // Command buttons - the key innovation!
@@ -1248,6 +1267,9 @@
                 this.recognition = null;
                 this.currentUtterance = null;
                 this.onCommand = null; // Callback when voice command is heard
+                this.onInterimDictation = null; // Callback for interim dictation results
+                this.onFinalDictation = null; // Callback for final dictation results
+                this.dictationMode = false; // When true, use continuous + interim results
                 this.allowAutoRestart = false; // Enable auto-restart only after welcome flow is complete
                 this.selectedDeviceId = localStorage.getItem('voiceEmailMicDeviceId') || 'default';
                 this.activeMicStream = null; // getUserMedia stream held open to nudge Chrome mic routing
@@ -1284,10 +1306,30 @@
                     this.recognition.lang = 'en-US';
 
                     this.recognition.onresult = (event) => {
-                        const command = event.results[0][0].transcript.trim();
-                        console.log('Heard:', command);
-                        this.cancel(); // Stop any ongoing speech
-                        if (this.onCommand) this.onCommand(command);
+                        if (this.dictationMode) {
+                            // Dictation mode: collect interim and final results
+                            let finalTranscript = '';
+                            let interimTranscript = '';
+                            for (let i = event.resultIndex; i < event.results.length; i++) {
+                                if (event.results[i].isFinal) {
+                                    finalTranscript += event.results[i][0].transcript;
+                                } else {
+                                    interimTranscript += event.results[i][0].transcript;
+                                }
+                            }
+                            if (finalTranscript.trim()) {
+                                console.log('Dictation final:', finalTranscript.trim());
+                                this.cancel(); // Stop any ongoing TTS
+                                if (this.onFinalDictation) this.onFinalDictation(finalTranscript.trim());
+                            }
+                            if (this.onInterimDictation) this.onInterimDictation(interimTranscript.trim());
+                        } else {
+                            // Command mode: single final result
+                            const command = event.results[0][0].transcript.trim();
+                            console.log('Heard:', command);
+                            this.cancel(); // Stop any ongoing speech
+                            if (this.onCommand) this.onCommand(command);
+                        }
                     };
 
                     this.recognition.onerror = (event) => {
@@ -1324,6 +1366,28 @@
                     }
                 }
                 return false;
+            }
+
+            // Switch to dictation mode: continuous listening with interim results
+            enterDictationMode() {
+                if (!this.recognition) return;
+                this.dictationMode = true;
+                try { this.recognition.stop(); } catch (e) {}
+                this.recognition.continuous = true;
+                this.recognition.interimResults = true;
+                // Small delay to let stop() complete before restarting
+                setTimeout(() => this.startListening(), 150);
+            }
+
+            // Switch back to command mode: single utterance, final results only
+            exitDictationMode() {
+                if (!this.recognition) return;
+                this.dictationMode = false;
+                try { this.recognition.stop(); } catch (e) {}
+                this.recognition.continuous = false;
+                this.recognition.interimResults = false;
+                // Small delay, then restart in command mode
+                setTimeout(() => this.startListening(), 150);
             }
 
             // Set the active microphone device. Holds a getUserMedia stream on the chosen
@@ -2128,9 +2192,15 @@
                 this.pendingResolver = null;
                 this.dictationTimeout = null;
                 this.dictationSilenceTimeout = null;
+                this.commandCooldown = false; // Guard against accidental commands after dictation ends
+                this.committedDictation = ''; // Finalized dictation text accumulated during voice input
 
                 // Wire up speech recognition
                 this.speech.onCommand = (cmd) => this.handleCommand(cmd);
+
+                // Wire up dictation callbacks
+                this.speech.onFinalDictation = (text) => this.handleDictationFinal(text);
+                this.speech.onInterimDictation = (text) => this.handleDictationInterim(text);
 
                 // Wire up model changes to view updates
                 this.model.onChange(() => this.updateView());
@@ -2251,7 +2321,19 @@
                         execute: () => this.signOut()
                     },
 
-                    
+                    // Dictation commands
+                    {
+                        id: 'done-dictating', icon: '✅', label: 'Done',
+                        voiceMatch: null, // Voice "done" is handled in handleDictationFinal, not here
+                        isAvailable: () => m.state === 'dictating',
+                        execute: () => this.finishDictation()
+                    },
+                    {
+                        id: 'cancel-dictating', icon: '✗', label: 'Cancel',
+                        voiceMatch: null,
+                        isAvailable: () => m.state === 'dictating',
+                        execute: () => this.cancelDictation()
+                    },
 
                     // Confirmation commands (for multi-step flows)
                     {
@@ -2372,22 +2454,47 @@
                        cmd === 'file';
             }
 
-            handleCommand(spokenCommand) {
-                this.view.updateStatus('I heard you say:', `"${spokenCommand}"`);
+            // Handle final dictation results (from continuous speech recognition in dictation mode)
+            handleDictationFinal(text) {
+                if (this.model.state !== 'dictating') return;
 
-                // Special handling for dictation mode
-                if (this.model.state === 'dictating') {
-                    if (!this.model.userTouchedTextArea && this.view.getDictationText()) {
-                        // First speech during edit with untouched text area:
-                        // clear pre-filled text and replace with new dictation
-                        this.view.setDictationText(spokenCommand);
-                        this.model.userTouchedTextArea = true;
-                    } else {
-                        this.view.appendDictationText(spokenCommand);
-                    }
-                    this.resetDictationTimeout();
+                // Check if user said "done" or "finished" to end dictation
+                const lower = text.toLowerCase().trim();
+                if (lower === 'done' || lower === "i'm done" || lower === 'finished' || lower === "i'm finished" || lower === "that's it") {
+                    this.view.clearInterimText();
+                    this.finishDictation();
                     return;
                 }
+
+                // Append finalized text to the dictation display
+                if (!this.model.userTouchedTextArea && this.view.getDictationText()) {
+                    // First speech during edit with untouched text area:
+                    // clear pre-filled text and replace with new dictation
+                    this.view.setDictationText(text);
+                    this.committedDictation = text;
+                    this.model.userTouchedTextArea = true;
+                } else {
+                    this.view.appendDictationText(text);
+                    this.committedDictation = this.view.getDictationText();
+                }
+                this.view.clearInterimText();
+                this.resetDictationTimeout();
+            }
+
+            // Handle interim dictation results (show words as user speaks)
+            handleDictationInterim(text) {
+                if (this.model.state !== 'dictating') return;
+                this.view.showInterimText(text);
+            }
+
+            handleCommand(spokenCommand) {
+                // Guard: ignore commands during cooldown (prevents accidental sends after dictation ends)
+                if (this.commandCooldown) {
+                    console.log('Command ignored during cooldown:', spokenCommand);
+                    return;
+                }
+
+                this.view.updateStatus('I heard you say:', `"${spokenCommand}"`);
 
                 // Special handling for forward recipient voice search
                 if (this.model.state === 'confirming-forward-recipient') {
@@ -2533,20 +2640,41 @@
             }
 
             // ========== DICTATION HELPERS ==========
+
+            // Enter dictation mode: switch speech recognition to continuous + interim
+            startDictationMode() {
+                this.committedDictation = '';
+                this.speech.enterDictationMode();
+                this.startDictationSilenceTimeout();
+            }
+
+            // Exit dictation mode: switch speech recognition back to command mode
+            // Activates a cooldown guard to prevent accidental command execution
+            stopDictationMode() {
+                this.view.clearInterimText();
+                this.speech.exitDictationMode();
+                // Cooldown: ignore voice commands for 3 seconds after leaving dictation
+                // This prevents the mic from picking up leftover speech or TTS echo
+                this.commandCooldown = true;
+                setTimeout(() => { this.commandCooldown = false; }, 3000);
+            }
+
             resetDictationTimeout() {
                 if (this.dictationTimeout) clearTimeout(this.dictationTimeout);
                 // User has spoken or typed, so reset the silence timeout too
                 this.clearDictationSilenceTimeout();
+                // Long fallback: auto-finish after 45 seconds of silence
+                // Primary way to finish is saying "done" or tapping the Done button
                 this.dictationTimeout = setTimeout(() => {
                     const text = this.view.getDictationText();
                     if (text) {
                         this.model.dictatedText = text;
                         this.finishDictation();
                     }
-                }, 10000);
+                }, 45000);
             }
 
-            // Start a 30-second silence timeout that cancels dictation if nothing is said or typed
+            // Start a 60-second silence timeout that cancels dictation if nothing is said or typed
             startDictationSilenceTimeout() {
                 this.clearDictationSilenceTimeout();
                 this.dictationSilenceTimeout = setTimeout(() => {
@@ -2573,6 +2701,7 @@
             cancelDictation() {
                 if (this.dictationTimeout) clearTimeout(this.dictationTimeout);
                 this.clearDictationSilenceTimeout();
+                this.stopDictationMode();
                 this.view.hideDictation();
                 this.model.dictatedText = '';
                 this.speech.speak('No response detected. Going back.');
@@ -2585,6 +2714,7 @@
             finishDictation() {
                 if (this.dictationTimeout) clearTimeout(this.dictationTimeout);
                 this.clearDictationSilenceTimeout();
+                this.stopDictationMode();
                 this.model.dictatedText = this.view.getDictationText();
                 if (this.pendingResolver) {
                     this.resolvePending(this.model.dictatedText);
@@ -3054,24 +3184,25 @@
 
                 // Start dictation
                 this.model.setState('dictating');
-                this.startDictationSilenceTimeout();
 
                 if (isEdit) {
                     this.model.userTouchedTextArea = false;
                     // Preserve existing text for editing
-                    this.view.updateStatus('Editing response', 'Speak to replace, or tap text to edit by hand');
+                    this.view.updateStatus('Editing response', 'Speak to replace, or tap text to edit by hand. Say "done" when finished.');
                     this.view.showDictation(this.model.dictatedText, true);
-                    this.speech.speak('Your previous message is shown. Speak to replace it, or tap the text to edit it by hand.');
+                    this.startDictationMode();
+                    this.speech.speak('Your previous message is shown. Speak to replace it, or tap the text to edit it by hand. Say done when finished.');
                 } else {
                     this.model.userTouchedTextArea = true;
                     this.model.dictatedText = '';
-                    this.view.updateStatus('Listening for response', `Start speaking your reply`);
+                    this.view.updateStatus('Listening for response', 'Say "done" when finished');
                     this.view.showDictation('', true);
+                    this.startDictationMode();
 
                     if (isReplyAll) {
-                        this.speech.speak('What would you like to say in your response to the group?');
+                        this.speech.speak('What would you like to say in your response to the group? Say done when finished.');
                     } else {
-                        this.speech.speak(`What would you like to say in your response to ${senderName}?`);
+                        this.speech.speak(`What would you like to say in your response to ${senderName}? Say done when finished.`);
                     }
                 }
 
@@ -3230,10 +3361,10 @@
                     // Edit: skip "add a message?" and go straight to dictation with preserved text
                     this.model.userTouchedTextArea = false;
                     this.model.setState('dictating');
-                    this.startDictationSilenceTimeout();
-                    this.view.updateStatus('Editing message', 'Speak to replace, or tap text to edit by hand');
+                    this.view.updateStatus('Editing message', 'Speak to replace, or tap text to edit by hand. Say "done" when finished.');
                     this.view.showDictation(this.model.dictatedText, true);
-                    this.speech.speak('Your previous message is shown. Speak to replace it, or tap the text to edit it by hand.');
+                    this.startDictationMode();
+                    this.speech.speak('Your previous message is shown. Speak to replace it, or tap the text to edit it by hand. Say done when finished.');
 
                     forwardMessage = await this.waitForResponse();
 
@@ -3273,10 +3404,10 @@
                         this.model.dictatedText = '';
                         this.model.userTouchedTextArea = true;
                         this.model.setState('dictating');
-                        this.startDictationSilenceTimeout();
-                        this.view.updateStatus('Listening for message');
+                        this.view.updateStatus('Listening for message', 'Say "done" when finished');
                         this.view.showDictation('', true);
-                        this.speech.speak('What would you like to say in your message?');
+                        this.startDictationMode();
+                        this.speech.speak('What would you like to say in your message? Say done when finished.');
 
                         forwardMessage = await this.waitForResponse();
 
