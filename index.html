@@ -3550,14 +3550,15 @@
                     await this.speech.speak('I found an unsubscribe link. I will click it. You may need to take some action in your browser.');
                     this.view.updateStatus('Opening unsubscribe link...');
                     window.open(match[0], '_blank');
+                    await this.speech.speak('Link opened. What would you like to do with this email?');
+                    return; // Wait for user's next command (e.g., archive, next, etc.)
                 } else {
                     await this.speech.speak('I could not find an unsubscribe link in this email. Marking as red so you can find it later.'); // Intentional: "red" not "read" for correct TTS pronunciation
+                    await this.gmail.modifyEmail(this.model.currentEmail.id, [], ['UNREAD']);
+                    await this.speech.speak('Marked as red. Moving to next email.'); // Intentional: "red" not "read" for correct TTS pronunciation
+                    this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
+                    this.readCurrentEmail();
                 }
-
-                await this.gmail.modifyEmail(this.model.currentEmail.id, [], ['UNREAD']);
-                await this.speech.speak('Marked as red. Moving to next email.'); // Intentional: "red" not "read" for correct TTS pronunciation
-                this.model.setCurrentEmailIndex(this.model.currentEmailIndex + 1);
-                this.readCurrentEmail();
             }
 
             // ========== ATTACHMENTS ==========
