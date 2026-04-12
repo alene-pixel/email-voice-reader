@@ -2463,6 +2463,7 @@
                 const lower = text.toLowerCase().trim();
                 if (lower === 'done' || lower === "i'm done" || lower === 'finished' || lower === "i'm finished" || lower === "that's it") {
                     this.view.clearInterimText();
+                    this.view.updateStatus('I heard you say:', `"${text}"`);
                     this.finishDictation();
                     return;
                 }
