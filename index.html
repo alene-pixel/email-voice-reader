@@ -2486,6 +2486,13 @@
             // Handle interim dictation results (show words as user speaks)
             handleDictationInterim(text) {
                 if (this.model.state !== 'dictating') return;
+                // Don't show "done" commands in the purple dictation area —
+                // they'll be caught by handleDictationFinal and shown in the status area instead
+                const lower = text.toLowerCase().trim();
+                if (lower === 'done' || lower === "i'm done" || lower === 'finished' || lower === "i'm finished" || lower === "that's it") {
+                    this.view.clearInterimText();
+                    return;
+                }
                 this.view.showInterimText(text);
             }
 
