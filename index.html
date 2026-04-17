@@ -2486,6 +2486,9 @@
             // Handle interim dictation results (show words as user speaks)
             handleDictationInterim(text) {
                 if (this.model.state !== 'dictating') return;
+                // Don't show interim text while TTS is playing — the mic picks up
+                // the app's own voice and displaying it just clutters the screen
+                if (this.speech.isSpeaking) return;
                 // Don't show "done" commands in the purple dictation area —
                 // they'll be caught by handleDictationFinal and shown in the status area instead
                 const lower = text.toLowerCase().trim();
