@@ -2250,9 +2250,10 @@
                 this.commandCooldown = false; // Guard against accidental commands after dictation ends
                 this.committedDictation = ''; // Finalized dictation text accumulated during voice input
 
-                // Brief cooldown applied right after the displayed email changes, to swallow
-                // accidental double-taps that would otherwise act on the newly loaded email.
-                this.lastShownEmailId = null;
+                // Set on each button tap to swallow accidental rapid double-taps —
+                // a single physical click on mobile can fire two synthetic taps,
+                // and without this they'd both advance the email index, skipping
+                // an unread email past the user.
                 this.buttonsLockedUntil = 0;
 
                 // Wire up speech recognition
@@ -2285,16 +2286,6 @@
             getAvailableCommands() {
                 const m = this.model;
                 const commands = [];
-
-                // When the displayed email just changed, briefly lock the action buttons.
-                // Without this, a quick second tap on the phone (e.g., archive twice)
-                // would carry over to the freshly loaded next email — Alene reported
-                // accidentally archiving a second email this way.
-                const currentId = m.currentEmail ? m.currentEmail.id : null;
-                if (currentId && currentId !== this.lastShownEmailId) {
-                    this.buttonsLockedUntil = Date.now() + 1000;
-                    this.lastShownEmailId = currentId;
-                }
 
                 // Define all possible commands with their availability conditions
                 const allCommands = [
@@ -2461,9 +2452,10 @@
                             label: cmd.label,
                             execute: () => {
                                 if (Date.now() < this.buttonsLockedUntil) {
-                                    console.log('Command ignored — email just changed (preventing double-tap):', cmd.id);
+                                    console.log('Command ignored — too soon after previous tap (preventing double-tap):', cmd.id);
                                     return;
                                 }
+                                this.buttonsLockedUntil = Date.now() + 1000;
                                 this.speech.cancel(); // Stop any ongoing speech immediately
                                 originalExecute();
                             }
