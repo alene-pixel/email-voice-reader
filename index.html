@@ -2411,7 +2411,7 @@
                     },
                     {
                         id: 'reply-sender', icon: '👤', label: 'Sender Only',
-                        voiceMatch: (cmd) => cmd.includes('reply') && !cmd.includes('all') || cmd.includes('sender only') || cmd.includes('only sender'),
+                        voiceMatch: (cmd) => cmd.includes('reply') && !cmd.includes('all') || cmd.includes('sender only') || cmd.includes('only sender') || cmd.includes('thunder only') || cmd.includes('send her only'),
                         isAvailable: () => m.state === 'confirming-reply-type',
                         execute: () => this.resolvePending('reply')
                     },
