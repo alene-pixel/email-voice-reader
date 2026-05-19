@@ -924,7 +924,14 @@
 
             appendDictationText(text) {
                 const existing = this.getDictationText();
-                this.setDictationText(existing ? existing + ' ' + text : text);
+                if (!existing) {
+                    this.setDictationText(text);
+                    return;
+                }
+                // Don't insert a space when the new chunk starts with punctuation
+                // that hugs the previous word (e.g. after "exclamation point" → "!").
+                const noSpaceBefore = /^[!?,.;:)\]]/.test(text);
+                this.setDictationText(existing + (noSpaceBefore ? '' : ' ') + text);
             }
 
             showInterimText(text) {
@@ -2521,6 +2528,21 @@
                        cmd === 'file';
             }
 
+            // Convert spoken punctuation words to symbols. The Web Speech API does
+            // this inconsistently — sometimes "exclamation point" comes through as "!",
+            // sometimes as the literal words. Force the symbol every time.
+            applyDictationSubstitutions(text) {
+                if (!text) return text;
+                text = text.replace(/\s*\bexclamation\s+(point|mark)\b/gi, '!');
+                text = text.replace(/\s*\bquestion\s+mark\b/gi, '?');
+                text = text.replace(/\s*\bperiod\b/gi, '.');
+                text = text.replace(/\s*\bcomma\b/gi, ',');
+                // Tidy any stray space left before close-punctuation (from either
+                // our substitution above or the speech API's own substitutions).
+                text = text.replace(/\s+([!?,.;:)\]])/g, '$1');
+                return text;
+            }
+
             // Handle final dictation results (from continuous speech recognition in dictation mode)
             handleDictationFinal(text) {
                 if (this.model.state !== 'dictating') return;
@@ -2533,6 +2555,8 @@
                     this.finishDictation();
                     return;
                 }
+
+                text = this.applyDictationSubstitutions(text);
 
                 // Append finalized text to the dictation display
                 if (!this.model.userTouchedTextArea && this.view.getDictationText()) {
@@ -2562,7 +2586,7 @@
                     this.view.clearInterimText();
                     return;
                 }
-                this.view.showInterimText(text);
+                this.view.showInterimText(this.applyDictationSubstitutions(text));
             }
 
             handleCommand(spokenCommand) {
