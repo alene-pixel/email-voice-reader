@@ -626,6 +626,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
     <script>
         // Configure pdf.js worker
         if (typeof pdfjsLib !== 'undefined') {
@@ -2199,13 +2200,79 @@
                     }
 
                     if (fullText.trim().length === 0) {
-                        return { success: false, error: 'PDF appears to be image-based or empty. Cannot extract text.' };
+                        return {
+                            success: false,
+                            error: 'PDF appears to be image-based or empty. Cannot extract text.',
+                            needsOcr: true,
+                            base64Data: base64Data,
+                            numPages: pdf.numPages
+                        };
                     }
 
                     return { success: true, text: fullText.trim() };
                 } catch (e) {
                     console.error('PDF extraction error:', e);
                     return { success: false, error: 'Failed to read PDF file' };
+                }
+            }
+
+            // Extract text from PDF using OCR (Tesseract.js) for scanned/image-based PDFs.
+            // onProgress(msg) is called before each page; if it returns truthy, OCR aborts.
+            async extractPdfTextViaOcr(base64Data, onProgress) {
+                try {
+                    if (typeof pdfjsLib === 'undefined') {
+                        return { success: false, error: 'PDF reader not available' };
+                    }
+                    if (typeof Tesseract === 'undefined') {
+                        return { success: false, error: 'OCR engine not available. Please check your internet connection.' };
+                    }
+
+                    const binaryString = atob(base64Data.replace(/-/g, '+').replace(/_/g, '/'));
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+
+                    const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+                    const numPages = pdf.numPages;
+
+                    if (onProgress && onProgress('Loading OCR engine...')) {
+                        return { success: false, error: 'OCR stopped by user.' };
+                    }
+                    const worker = await Tesseract.createWorker('eng');
+
+                    let fullText = '';
+                    try {
+                        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                            if (onProgress && onProgress(`OCRing page ${pageNum} of ${numPages}...`)) {
+                                return { success: false, error: 'OCR stopped by user.' };
+                            }
+
+                            const page = await pdf.getPage(pageNum);
+                            const viewport = page.getViewport({ scale: 2.0 });
+
+                            const canvas = document.createElement('canvas');
+                            canvas.width = viewport.width;
+                            canvas.height = viewport.height;
+                            const ctx = canvas.getContext('2d');
+
+                            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+                            const { data: { text } } = await worker.recognize(canvas);
+                            fullText += text + '\n\n';
+                        }
+                    } finally {
+                        await worker.terminate();
+                    }
+
+                    if (fullText.trim().length === 0) {
+                        return { success: false, error: 'OCR completed but no text could be extracted.' };
+                    }
+
+                    return { success: true, text: fullText.trim() };
+                } catch (e) {
+                    console.error('PDF OCR error:', e);
+                    return { success: false, error: 'Failed to OCR PDF file: ' + (e.message || e) };
                 }
             }
 
@@ -3756,10 +3823,31 @@
                     const attachment = readableAttachments[i];
                     this.view.updateStatus(`Extracting ${attachment.filename}...`);
 
-                    const result = await this.gmail.extractAttachmentText(
+                    let result = await this.gmail.extractAttachmentText(
                         this.model.currentEmail.id,
                         attachment
                     );
+
+                    // OCR fallback for scanned (image-based) PDFs
+                    if (!result.success && result.needsOcr) {
+                        const pageWord = result.numPages === 1 ? 'page' : 'pages';
+                        await this.speech.speak(
+                            `${attachment.filename} is a scanned image, not text. Running OCR on ${result.numPages} ${pageWord}. This may take a few minutes. Tap Stop to cancel.`
+                        );
+
+                        if (this.model.state !== 'reading-attachment') {
+                            this.view.updateStatus('Stopped reading attachments');
+                            return;
+                        }
+
+                        result = await this.gmail.extractPdfTextViaOcr(
+                            result.base64Data,
+                            (msg) => {
+                                this.view.updateStatus(msg);
+                                return this.model.state !== 'reading-attachment';
+                            }
+                        );
+                    }
 
                     if (result.success) {
                         const header = readableAttachments.length > 1
