@@ -640,6 +640,48 @@
         console.log('=== EMAIL VOICE READER VERSION 4.0 (MVC) LOADED ===');
 
         // ============================================================
+        // LIC-SPECIFIC DICTIONARY (Alene's customizations)
+        // ------------------------------------------------------------
+        // This block customizes spelling and pronunciation for words
+        // specific to Legal Impact for Chickens (LIC). To make the app
+        // generic for other users, delete this entire block (and the
+        // two applyLICDictionary calls in onresult and speakChunk) —
+        // no other code changes needed.
+        //
+        // DICTATION_REPLACEMENTS: when speech recognition hears the
+        // KEY, write the VALUE instead. Matched case-insensitively at
+        // word boundaries.
+        //   Example: hearing "ashley" or "Ashley" → writes "Ashely"
+        //
+        // PRONUNCIATION_REPLACEMENTS: when the TTS reader encounters
+        // the KEY in email text, speak the VALUE instead so it sounds
+        // right. Matched case-insensitively at word boundaries.
+        //   Example: "LIC" → "lick" so the reader says "lick" not
+        //   "L-I-C"
+        // ============================================================
+        const LIC_DICTATION_REPLACEMENTS = {
+            'ashley': 'Ashely'
+        };
+        const LIC_PRONUNCIATION_REPLACEMENTS = {
+            // (empty until Alene confirms which words need phonetic
+            // replacement)
+        };
+
+        function applyLICDictionary(text, dictionary) {
+            if (!text) return text;
+            let result = text;
+            for (const [key, value] of Object.entries(dictionary)) {
+                const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const pattern = new RegExp(`\\b${escaped}\\b`, 'gi');
+                result = result.replace(pattern, value);
+            }
+            return result;
+        }
+        // ============================================================
+        // END LIC-SPECIFIC DICTIONARY
+        // ============================================================
+
+        // ============================================================
         // MODEL - All application state lives here
         // ============================================================
         class EmailReaderModel {
@@ -1380,6 +1422,9 @@
                                     interimTranscript += event.results[i][0].transcript;
                                 }
                             }
+                            // LIC dictionary: apply spelling overrides to what was heard
+                            finalTranscript = applyLICDictionary(finalTranscript, LIC_DICTATION_REPLACEMENTS);
+                            interimTranscript = applyLICDictionary(interimTranscript, LIC_DICTATION_REPLACEMENTS);
                             if (finalTranscript.trim()) {
                                 console.log('Dictation final:', finalTranscript.trim());
                                 this.cancel(); // Stop any ongoing TTS
@@ -1625,7 +1670,9 @@
                         return;
                     }
 
-                    this.currentUtterance = new SpeechSynthesisUtterance(text);
+                    // LIC dictionary: apply pronunciation overrides before TTS
+                    const speechText = applyLICDictionary(text, LIC_PRONUNCIATION_REPLACEMENTS);
+                    this.currentUtterance = new SpeechSynthesisUtterance(speechText);
                     this.currentUtterance.rate = 1.0;
                     this.currentUtterance.pitch = 1.0;
                     this.currentUtterance.volume = 1.0;
