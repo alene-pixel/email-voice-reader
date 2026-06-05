@@ -3845,22 +3845,20 @@
                 this.model.setState('reading-attachment');
                 this.view.updateStatus('Extracting attachment text...');
 
-                // Phase 1: Announce and extract all attachment text up front
+                // Announce
                 if (readableAttachments.length === 1) {
                     await this.speech.speak(`Reading ${readableAttachments[0].filename}. Please wait while I extract the text.`);
                 } else {
-                    await this.speech.speak(`Reading ${readableAttachments.length} attachments. Please wait while I extract the text.`);
+                    await this.speech.speak(`Reading ${readableAttachments.length} attachments.`);
                 }
 
-                // Check if user stopped during announcement
                 if (this.model.state !== 'reading-attachment') {
                     this.view.updateStatus('Stopped reading attachments');
                     return;
                 }
 
-                let combinedText = '';
-                let successCount = 0;
-
+                // For each attachment: extract/OCR, then immediately read it out loud
+                // before moving on to the next.
                 for (let i = 0; i < readableAttachments.length; i++) {
                     if (this.model.state !== 'reading-attachment') {
                         this.view.updateStatus('Stopped reading attachments');
@@ -3896,49 +3894,36 @@
                         );
                     }
 
-                    if (result.success) {
-                        const header = readableAttachments.length > 1
-                            ? `Attachment ${i + 1} of ${readableAttachments.length}: ${attachment.filename}.\n\n`
-                            : `${attachment.filename}.\n\n`;
-                        combinedText += header + result.text + '\n\n';
-                        successCount++;
-                    } else {
-                        const header = readableAttachments.length > 1
-                            ? `Attachment ${i + 1} of ${readableAttachments.length}: ${attachment.filename}.\n\n`
-                            : `${attachment.filename}.\n\n`;
-                        combinedText += header + `Sorry, I could not read this attachment. ${result.error}\n\n`;
+                    if (this.model.state !== 'reading-attachment') {
+                        this.view.updateStatus('Stopped reading attachments');
+                        return;
+                    }
+
+                    const header = readableAttachments.length > 1
+                        ? `Attachment ${i + 1} of ${readableAttachments.length}: ${attachment.filename}.\n\n`
+                        : `${attachment.filename}.\n\n`;
+                    const attachmentText = result.success
+                        ? header + result.text
+                        : header + `Sorry, I could not read this attachment. ${result.error}`;
+
+                    // Display this attachment on screen and read it before moving on
+                    this.model.attachmentDisplayText = attachmentText;
+                    this.view.setEmailBodyText(attachmentText);
+                    this.view.updateStatus(`Reading ${attachment.filename}...`);
+                    const textForSpeech = EmailUtils.stripUrlsForSpeech(attachmentText);
+                    await this.speech.speakWithScroll(textForSpeech, this.view, 0);
+
+                    if (this.speech.isCancelled || this.model.state !== 'reading-attachment') {
+                        this.view.updateStatus('Stopped reading attachments');
+                        return;
                     }
                 }
 
-                // Check if user stopped during extraction
-                if (this.model.state !== 'reading-attachment') {
-                    this.view.updateStatus('Stopped reading attachments');
-                    return;
-                }
-
-                if (successCount === 0) {
-                    await this.speech.speak('Sorry, I could not read any of the attachments.');
-                    this.model.setState('idle');
-                    return;
-                }
-
-                // Phase 2: Display attachment text on screen
-                combinedText = combinedText.trim();
-                this.model.attachmentDisplayText = combinedText;
-                this.view.setEmailBodyText(combinedText);
-
-                // Phase 3: Read with speakWithScroll for leap/retreat support
-                this.view.updateStatus('Reading attachments...');
-                const textForSpeech = EmailUtils.stripUrlsForSpeech(combinedText);
-                await this.speech.speakWithScroll(textForSpeech, this.view, 0);
-
-                // Phase 4: Clean up (only if finished naturally, not cancelled)
-                if (!this.speech.isCancelled) {
-                    this.model.attachmentDisplayText = null;
-                    this.view.updateStatus('Finished reading attachments');
-                    await this.speech.speak('Finished reading attachments. What would you like to do with this email?');
-                    this.model.setState('idle');
-                }
+                // Finished naturally
+                this.model.attachmentDisplayText = null;
+                this.view.updateStatus('Finished reading attachments');
+                await this.speech.speak('Finished reading attachments. What would you like to do with this email?');
+                this.model.setState('idle');
             }
         }
 
