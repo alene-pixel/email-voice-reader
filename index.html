@@ -3879,7 +3879,7 @@
                     if (!result.success && result.needsOcr) {
                         const pageWord = result.numPages === 1 ? 'page' : 'pages';
                         await this.speech.speak(
-                            `${attachment.filename} is a scanned image, not text. Running OCR on ${result.numPages} ${pageWord}. This may take a few minutes. Tap Stop to cancel.`
+                            `${attachment.filename} is a scanned image, not text. Running OCR on ${result.numPages} ${pageWord}. This may take a few minutes. Say or tap Stop to cancel.`
                         );
 
                         if (this.model.state !== 'reading-attachment') {
