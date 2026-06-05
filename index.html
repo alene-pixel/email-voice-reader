@@ -2657,6 +2657,25 @@
                 return text;
             }
 
+            // Capitalize the first letter of each sentence. The Web Speech API
+            // returns lowercase transcripts (especially on mobile), so we
+            // restore sentence-start capitalization here. A chunk's first
+            // letter is capitalized when it lands at the start of the box or
+            // right after sentence-ending punctuation in the existing text;
+            // letters after '. ', '! ', or '? ' inside the chunk itself also
+            // get capitalized.
+            capitalizeForContext(text, existing) {
+                if (!text) return text;
+                const trimmedExisting = (existing || '').replace(/\s+$/, '');
+                const lastChar = trimmedExisting.slice(-1);
+                const atSentenceStart = !trimmedExisting || /[.!?]/.test(lastChar);
+                if (atSentenceStart) {
+                    text = text.replace(/^(\s*)([a-z])/, (_, ws, ch) => ws + ch.toUpperCase());
+                }
+                text = text.replace(/([.!?]\s+)([a-z])/g, (_, p, c) => p + c.toUpperCase());
+                return text;
+            }
+
             // Handle final dictation results (from continuous speech recognition in dictation mode)
             handleDictationFinal(text) {
                 if (this.model.state !== 'dictating') return;
@@ -2673,7 +2692,11 @@
                 text = this.applyDictationSubstitutions(text);
 
                 // Append finalized text to the dictation display
-                if (!this.model.userTouchedTextArea && this.view.getDictationText()) {
+                const isReplacing = !this.model.userTouchedTextArea && this.view.getDictationText();
+                const existingForCap = isReplacing ? '' : this.view.getDictationText();
+                text = this.capitalizeForContext(text, existingForCap);
+
+                if (isReplacing) {
                     // First speech during edit with untouched text area:
                     // clear pre-filled text and replace with new dictation
                     this.view.setDictationText(text);
@@ -2700,7 +2723,9 @@
                     this.view.clearInterimText();
                     return;
                 }
-                this.view.showInterimText(this.applyDictationSubstitutions(text));
+                const isReplacing = !this.model.userTouchedTextArea && this.view.getDictationText();
+                const existingForCap = isReplacing ? '' : this.view.getDictationText();
+                this.view.showInterimText(this.capitalizeForContext(this.applyDictationSubstitutions(text), existingForCap));
             }
 
             handleCommand(spokenCommand) {

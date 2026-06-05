@@ -4,6 +4,12 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-06-05 — Capitalize the first letter of each dictated sentence
+
+**Summary**: Dictated replies now have proper sentence-start capitalization. Before this fix, every sentence Alene dictated landed in the reply box all lowercase because the Web Speech API returns raw lowercase transcripts (especially on mobile) and the app did no post-processing to restore capitalization. Added a small helper, `capitalizeForContext(text, existing)`, that uppercases the first letter of a chunk when it lands at the start of the box or right after sentence-ending punctuation, and also uppercases any letter inside the chunk that follows ". ", "! ", or "? ". Wired into both `handleDictationFinal` (the committed text) and `handleDictationInterim` (the live preview) so capitalization is correct both as she speaks and after each pause.
+
+---
+
 ## 2026-06-02 — LIC-specific dictation and pronunciation dictionary
 
 **Summary**: Added a segregated LIC-specific dictionary block near the top of `index.html` (right after the version banner) that lets Alene override (a) what speech recognition writes when it hears a given word, and (b) what TTS speaks when it encounters a given word in email text. Both maps share a single helper, `applyLICDictionary(text, dictionary)`, which does case-insensitive word-boundary replacement. First entry: hearing "Ashley" → write "Ashely" (so dictated replies use the correct spelling of Ashely Monti's name).
