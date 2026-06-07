@@ -4,6 +4,12 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-06-07 — Drop "or tap" from the OCR cancel prompt
+
+**Summary**: The OCR-starting announcement now says "Say Stop to cancel" instead of "Say or tap Stop to cancel." Alene preferred the shorter phrasing. Single-line change in the scanned-PDF branch of the attachment-reading flow.
+
+---
+
 ## 2026-06-05 — Capitalize the first letter of each dictated sentence
 
 **Summary**: Dictated replies now have proper sentence-start capitalization. Before this fix, every sentence Alene dictated landed in the reply box all lowercase because the Web Speech API returns raw lowercase transcripts (especially on mobile) and the app did no post-processing to restore capitalization. Added a small helper, `capitalizeForContext(text, existing)`, that uppercases the first letter of a chunk when it lands at the start of the box or right after sentence-ending punctuation, and also uppercases any letter inside the chunk that follows ". ", "! ", or "? ". Wired into both `handleDictationFinal` (the committed text) and `handleDictationInterim` (the live preview) so capitalization is correct both as she speaks and after each pause.
