@@ -4,6 +4,12 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-06-08 — Add "Kathryn" and "Greenfire" dictation rules
+
+**Summary**: Extended `LIC_DICTATION_REPLACEMENTS` with two new rules Alene requested. Whatever speech recognition hears as "Catherine," "Katherine," "Catheryn," or "Kathryn" now writes "Kathryn" (Kathryn Evans, LIC's staff attorney). Whatever it hears as "Greenfire" or "Green Fire" now writes "Greenfire" (as in Greenfire Law PC). Both rules rely on the existing case-insensitive word-boundary helper, so capitalization is normalized regardless of what Wispr / the Web Speech API emits.
+
+---
+
 ## 2026-06-07 — Drop "or tap" from the OCR cancel prompt
 
 **Summary**: The OCR-starting announcement now says "Say Stop to cancel" instead of "Say or tap Stop to cancel." Alene preferred the shorter phrasing. Single-line change in the scanned-PDF branch of the attachment-reading flow.
