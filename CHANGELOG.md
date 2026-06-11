@@ -4,6 +4,12 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-06-11 — Pronounce "Blome" as "Bloom"
+
+**Summary**: Added the first entry to `LIC_PRONUNCIATION_REPLACEMENTS`: when the TTS reader encounters "Blome" in email text, it now speaks "Bloom" instead. Uses the existing case-insensitive word-boundary helper (`applyLICDictionary`), applied in `speakChunk` right before each utterance — so the displayed text still reads "Blome" while only the spoken pronunciation changes.
+
+---
+
 ## 2026-06-08 — Add "Kathryn" and "Greenfire" dictation rules
 
 **Summary**: Extended `LIC_DICTATION_REPLACEMENTS` with two new rules Alene requested. Whatever speech recognition hears as "Catherine," "Katherine," "Catheryn," or "Kathryn" now writes "Kathryn" (Kathryn Evans, LIC's staff attorney). Whatever it hears as "Greenfire" or "Green Fire" now writes "Greenfire" (as in Greenfire Law PC). Both rules rely on the existing case-insensitive word-boundary helper, so capitalization is normalized regardless of what Wispr / the Web Speech API emits.
