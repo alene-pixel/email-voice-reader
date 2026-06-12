@@ -4,6 +4,12 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-06-12 — Pronounce "USA" as "U. S. A."
+
+**Summary**: Added `'USA': 'U. S. A.'` to `LIC_PRONUNCIATION_REPLACEMENTS` so the TTS reader spells out the letters instead of saying "oosa." Safe with sentence chunking: the substitution runs inside `speakChunk`, after `splitIntoSentences` has already split the text, so the periods in "U. S. A." never act as sentence boundaries. Displayed text still reads "USA"; only the spoken pronunciation changes.
+
+---
+
 ## 2026-06-11 — Pronounce "Blome" as "Bloom"
 
 **Summary**: Added the first entry to `LIC_PRONUNCIATION_REPLACEMENTS`: when the TTS reader encounters "Blome" in email text, it now speaks "Bloom" instead. Uses the existing case-insensitive word-boundary helper (`applyLICDictionary`), applied in `speakChunk` right before each utterance — so the displayed text still reads "Blome" while only the spoken pronunciation changes.
