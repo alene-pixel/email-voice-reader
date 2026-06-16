@@ -671,7 +671,7 @@
         const LIC_PRONUNCIATION_REPLACEMENTS = {
             'Blome': 'Bloom',  // say "Bloom", not "Blome"
             'USA': 'U. S. A.',  // spell out the letters, don't say "oosa"
-            'Nilsson': 'Nill-sun'  // respelled WITH A HYPHEN — the only form that made the iOS voice say a short "i" ("nill"). Every one-word spelling (Nilson, Nillson, Nillsun, Nihlsun) came out "NEEL". Goal: "NILL-sun" (short "i", stress on first syllable). If the voice still stresses the 2nd syllable ("nill-SUN"), weaken the 2nd syllable's spelling next — do NOT drop the hyphen.
+            'Nilsson': 'Nill-suhn'  // iOS TTS, tuned by ear. "Nill" (hyphenated) finally produces the short "i" — do NOT change "Nill" or drop the hyphen. 2nd syllable spelled "suhn" (a schwa/"uh" vowel) so it stays UNSTRESSED and the emphasis falls on the FIRST syllable. Goal: "NILL-suhn". History: "-sun" (full vowel) pulled stress to the 2nd syllable ("nill-SUN"); every one-word spelling (Nilson, Nillson, Nillsun, Nihlsun) came out "NEEL".
         };
 
         function applyLICDictionary(text, dictionary) {
