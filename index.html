@@ -671,7 +671,7 @@
         const LIC_PRONUNCIATION_REPLACEMENTS = {
             'Blome': 'Bloom',  // say "Bloom", not "Blome"
             'USA': 'U. S. A.',  // spell out the letters, don't say "oosa"
-            'Nilsson': 'Nilson'  // respelled as "Wilson" with an N — same letter pattern as the name the iOS voice reliably says "WIL-son". Goal: "NILL-sun" (short "i", stress on first syllable). Double-L / "ih" spellings (Nillson, Nillsun, Nihlsun) looked foreign and made the voice say "NEEL".
+            'Nilsson': 'Nill-sun'  // respelled WITH A HYPHEN — the only form that made the iOS voice say a short "i" ("nill"). Every one-word spelling (Nilson, Nillson, Nillsun, Nihlsun) came out "NEEL". Goal: "NILL-sun" (short "i", stress on first syllable). If the voice still stresses the 2nd syllable ("nill-SUN"), weaken the 2nd syllable's spelling next — do NOT drop the hyphen.
         };
 
         function applyLICDictionary(text, dictionary) {
