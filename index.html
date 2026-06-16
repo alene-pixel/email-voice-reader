@@ -671,7 +671,7 @@
         const LIC_PRONUNCIATION_REPLACEMENTS = {
             'Blome': 'Bloom',  // say "Bloom", not "Blome"
             'USA': 'U. S. A.',  // spell out the letters, don't say "oosa"
-            'Nilsson': 'Nillsun'  // respelled by ear for iOS TTS: one word → stress on first syllable; double-L + "-sun" ending → short "i" (avoids the "-son" surname model that says "NEEL"). Goal: "NILL-sun" (not "nill-SUN" or "NEEL-sun")
+            'Nilsson': 'Nihlsun'  // respelled by ear for iOS TTS. Goal: "NILL-sun" — short "i", stress on first syllable. "ih" spelling pushes the voice toward a short "i" (was saying "NEEL"); one word keeps the stress up front. Not "nill-SUN" or "NEEL-sun".
         };
 
         function applyLICDictionary(text, dictionary) {
