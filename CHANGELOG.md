@@ -4,6 +4,16 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-06-16 — "Nilsson" emphasis fixed: switch to "nill. sun" (period form)
+
+**Summary**: Changed `'Nilsson'` in `LIC_PRONUNCIATION_REPLACEMENTS` from `'nill sun'` to `'nill. sun'` — adding a period after "nill." This resolves the last open piece of the Nilsson pronunciation (see the earlier 2026-06-16 entry below, which fixed the short "i" vowel but left the emphasis on the 2nd syllable, "nill-SUN"). The period makes "nill" its own mini-sentence, so the iOS voice gives it a falling, end-of-sentence emphasis on the FIRST syllable ("NILL-sun"), while keeping the two pieces split preserves the short "i." Confirmed by ear by Alene.
+
+**How we found it**: Built a standalone pronunciation sandbox (`nilsson-sandbox.html`) — a phone-friendly page with a free-text box, one-tap candidate buttons, a voice picker, and an SSML check — so candidate spellings could be A/B-tested on-device without a deploy per attempt. The period form ("nill. sun") won across roughly a dozen candidates. Full attempt log and diagnosis live in the 2026-06-16 entry of KNOWN-ISSUES.md.
+
+**Safe with sentence chunking**: Same mechanism as the "U. S. A." entry below — the substitution runs inside `speakChunk`, *after* `splitIntoSentences` has already split the email text, so the period introduced in "nill. sun" never acts as a sentence boundary for the chunker. It lives inside a single utterance, where the iOS voice treats it as the internal phrase break that produces the first-syllable emphasis. Displayed email text is unchanged; only the spoken pronunciation changes.
+
+---
+
 ## 2026-06-16 — Speak the LIC domain as "Legal Impact for Chickens"
 
 **Summary**: Added `'legalimpactforchickens': 'Legal Impact for Chickens'` to `LIC_PRONUNCIATION_REPLACEMENTS` so the TTS reader speaks LIC email addresses naturally — e.g., `alene@legalimpactforchickens.org` now reads as "alene at Legal Impact for Chickens dot org" instead of mashing the domain into one garbled word.
