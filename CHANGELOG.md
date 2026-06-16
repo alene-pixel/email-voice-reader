@@ -4,6 +4,14 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-06-16 — Speak the LIC domain as "Legal Impact for Chickens"
+
+**Summary**: Added `'legalimpactforchickens': 'Legal Impact for Chickens'` to `LIC_PRONUNCIATION_REPLACEMENTS` so the TTS reader speaks LIC email addresses naturally — e.g., `alene@legalimpactforchickens.org` now reads as "alene at Legal Impact for Chickens dot org" instead of mashing the domain into one garbled word.
+
+**Why this works**: The existing `formatTextForSpeech()` step already converts email addresses to a spoken form ("@" → "at", "." → "dot") before the text is split into sentences, so `alene@legalimpactforchickens.org` is "alene at legalimpactforchickens dot org" by the time each chunk reaches `speakChunk()`. There, `applyLICDictionary(text, LIC_PRONUNCIATION_REPLACEMENTS)` does a case-insensitive word-boundary swap, which catches the now-standalone `legalimpactforchickens` token and replaces it with the four words "Legal Impact for Chickens." Displayed email text is unchanged; only the spoken pronunciation changes. The same one-line trick extends to any other long run-together domain that sounds bad. Requested by Alene; previously tracked in the app folder's TODO.md (removed now that this shipped).
+
+---
+
 ## 2026-06-16 — Pronounce "Nilsson" with a short "i" (vowel fixed; emphasis tuning ongoing)
 
 **Summary**: Added `'Nilsson': 'nill sun'` to `LIC_PRONUNCIATION_REPLACEMENTS` so the TTS reader says Isabella Nilsson's surname with a short "i" ("nill," like "pill") instead of the long-"ee" "NEEL-son" the iOS voice defaulted to. The vowel is now correct; the emphasis still lands on the 2nd syllable ("nill-SUN") rather than the 1st ("NILL-sun"). Across roughly nine respellings we found the voice trades the two off: any one-word spelling gives the right stress but the wrong vowel, while a hyphen or space gives the right vowel but stresses the last syllable. The current spelling favors the correct vowel, which Alene prioritized. Full attempt log, diagnosis, and untried ideas for a future session live in the 2026-06-16 entry of KNOWN-ISSUES.md. Displayed email text is unchanged; only the spoken pronunciation changes.
