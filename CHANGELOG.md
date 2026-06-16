@@ -4,6 +4,16 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-06-16 — Revert "Nilsson" to "nill sun" (period form regressed in the real app)
+
+**Summary**: Reverted `'Nilsson'` from `'nill. sun'` back to `'nill sun'`. The period form had tested as "NILL-sun" in the standalone sandbox, but once live the app read it as "neel-SUN" — the worst of both worlds (wrong vowel AND wrong stress). Per the app's "revert failed fixes completely" rule, restored the prior `'nill sun'` (short "i," stress slightly late), the best in-app result so far. The entry just below — which announced the period fix — is left in place as the honest record of what was tried; this entry supersedes it.
+
+**Root cause**: The pronunciation swap runs inside `speakChunk`, AFTER `splitIntoSentences`. In a real email the surname sits mid-sentence ("Isabella Nilsson is …"), so after the swap the spoken utterance is "Isabella nill. sun is …" — the inserted period acts as an internal phrase break, ending one phrase on "nill" and starting a fresh one on "sun …". On the default iOS voice that flipped both the vowel and the stress. The standalone sandbox never surfaced this because it spoke the name in isolation / phrase-final, with nothing after "sun."
+
+**Fix forward**: `nilsson-sandbox.html` is being upgraded to speak each candidate IN CONTEXT — embedded in a full sentence and run through the same `formatTextForSpeech` → `splitIntoSentences` → `speakChunk` path the app uses — so candidates are tested the way the app actually says them. Next idea queued: "Nill's son" (the surname derives from "Nils's son"), whose natural English possessive stress falls on the first word.
+
+---
+
 ## 2026-06-16 — "Nilsson" emphasis fixed: switch to "nill. sun" (period form)
 
 **Summary**: Changed `'Nilsson'` in `LIC_PRONUNCIATION_REPLACEMENTS` from `'nill sun'` to `'nill. sun'` — adding a period after "nill." This resolves the last open piece of the Nilsson pronunciation (see the earlier 2026-06-16 entry below, which fixed the short "i" vowel but left the emphasis on the 2nd syllable, "nill-SUN"). The period makes "nill" its own mini-sentence, so the iOS voice gives it a falling, end-of-sentence emphasis on the FIRST syllable ("NILL-sun"), while keeping the two pieces split preserves the short "i." Confirmed by ear by Alene.

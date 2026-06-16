@@ -4,9 +4,9 @@ Newest entries at the top. This file tracks user-reported issues with the Voice 
 
 ---
 
-## 2026-06-16 — "Nilsson" TTS pronunciation [RESOLVED] — the period form "nill. sun"
+## 2026-06-16 — "Nilsson" TTS pronunciation [REOPENED] — period form failed in-app; must tune in context
 
-**Status**: RESOLVED — deployed 2026-06-16. Winning spelling: **`nill. sun`** (period after "nill," space before "sun"), now live in the app's `LIC_PRONUNCIATION_REPLACEMENTS`. The period makes "nill" its own mini-sentence, so the voice gives it a falling end-of-sentence emphasis on the FIRST syllable ("NILL-sun") while the split keeps the short "i." Found via the pronunciation sandbox (idea 1 below); Alene confirmed by ear. One gut-check still worth doing in normal use: that it sounds right inside a full email sentence ("Isabella Nilsson …"), since there the surname is not utterance-final; if it is ever off in context, the sandbox (`nilsson-sandbox.html`) remains for fine-tuning.
+**Status**: OPEN (reopened 2026-06-16). The period form `nill. sun` won in the standalone sandbox but REGRESSED to "neel-SUN" once live — the worst of both worlds (wrong vowel AND wrong stress). **Root cause**: the app speaks the surname mid-sentence ("Isabella nill. sun is …"), where the inserted period becomes an internal phrase break that flips both vowel and stress on the default voice; the sandbox had spoken the name in isolation / phrase-final and never surfaced this. App reverted to `nill sun` (short "i," stress slightly late) — the best in-app result so far. **Key lesson: tune candidates IN CONTEXT — embedded in a full sentence, processed the same way the app processes email text — not in isolation.** The sandbox (`nilsson-sandbox.html`) is being upgraded to do exactly that. **Next idea: `Nill's son`** (Isabella's — the surname derives from "Nils's son"; English possessive stress naturally falls on the first word, "NILL's son," which could fix the vowel and the stress at once).
 
 **Reporter**: Alene.
 
@@ -33,7 +33,7 @@ Newest entries at the top. This file tracks user-reported issues with the Voice 
 | 7 | `Nill-suhn` (hyphen, schwa 2nd syllable) | short "i" ✓ | 2nd syllable ✗ | "nill-SUN" |
 | 8 | `Nill-son` (hyphen, surname suffix) | short "i" ✓ | 2nd syllable ✗ | "nill-SUN" |
 | 9 | `nill sun` (two separate words) | short "i" ✓ | 2nd syllable ✗ | "nill-SUN" |
-| 10 | `nill. sun` (period after "nill") | short "i" ✓ | 1st syllable ✓ | **"NILL-sun" — WINNER (deployed)** |
+| 10 | `nill. sun` (period after "nill") | sandbox ✓ / app ✗ | sandbox ✓ / app ✗ | sandbox said "NILL-sun" but the **app said "neel-SUN"** — the period became a mid-sentence break in real emails; reverted |
 
 **Diagnosis — what the pattern shows**:
 - **The voice has two modes, and they trade off against each other:**
@@ -42,7 +42,7 @@ Newest entries at the top. This file tracks user-reported issues with the Voice 
 - **In the hyphen/space modes the stress is positional, not vowel-driven.** Respelling the 2nd syllable three different ways — `sun` (full vowel), `suhn` (schwa), `son` (a real surname suffix that voices usually de-accent) — did NOT move the stress off the 2nd syllable. The voice seems to simply stress the last syllable of a hyphenated or two-word item.
 - **Capitalization does not affect stress.** `NILL-sun` (caps on the first syllable) still stressed the 2nd syllable.
 
-**Current live state**: `'Nilsson': 'nill. sun'` → "NILL-sun" (short "i," first-syllable emphasis). Deployed 2026-06-16. This solves both the vowel and the emphasis; the period (a sibling of the comma idea below, originally set aside over a feared pause) turned out to be the lever that finally moved the stress forward.
+**Current live state**: `'Nilsson': 'nill sun'` → "nill-SUN" in-app (short "i," stress slightly late). Reverted here on 2026-06-16 after the period form `nill. sun` regressed to "neel-SUN" in real emails (see Status). Best in-app result so far; the first-syllable emphasis is still being worked, now via in-context sandbox testing.
 
 **Ideas NOT yet tried (for the next session)**:
 1. **Pronunciation sandbox page** — DONE (2026-06-16). Built and deployed as a standalone page that does NOT touch the app: https://alene-pixel.github.io/email-voice-reader/nilsson-sandbox.html (source: `nilsson-sandbox.html` in the repo root; added in commit `91e80bd`, separate from `index.html`). It mimics the app's exact TTS path (`SpeechSynthesisUtterance`, rate/pitch 1.0, no voice override = system default, plus the paused-resume workaround) and adds: a free-text box (type any spelling, hear it — zero further deploys needed for new ideas), a voice picker (try iOS voices other than the default — idea 2 above), speed/pitch sliders (default 1.0/1.0 to match the app; slowing speed helps hear which syllable is stressed), an "Isabella …" full-name toggle (test in realistic context), an SSML-`<emphasis>` check (idea 3 above), and one-tap buttons for the candidate spellings (accent marks like `níll sun` / `níllson`, comma/period breaks like `nill, sun`, alt-vowel forms like `nyllson`, the IPA stress mark `ˈnill sun`, and the drag-out-the-syllable idea like `nilllll sun`). Awaiting Alene's on-phone test results.
