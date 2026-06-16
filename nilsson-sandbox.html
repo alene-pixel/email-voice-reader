@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nilsson pronunciation sandbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold:#c9ab72;
+    --ink:#222;
+    --muted:#6b6b6b;
+    --line:#e3e3e3;
+    --soft:#faf6ec;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;-webkit-text-size-adjust:100%;}
+  body{
+    font-family:'Open Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    color:var(--ink);background:#fff;font-size:17px;line-height:1.45;
+  }
+  .wrap{max-width:640px;margin:0 auto;padding:18px 16px 70px;}
+  h1{font-size:22px;margin:0 0 4px;}
+  h2{font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--gold);
+     margin:26px 0 8px;border-bottom:2px solid var(--gold);padding-bottom:5px;}
+  p.lede{color:var(--muted);margin:0 0 14px;font-size:15px;}
+  .goal{background:var(--soft);border:1px solid var(--gold);border-radius:10px;
+        padding:12px 14px;margin:12px 0 18px;font-size:15px;}
+  .goal b{color:#7a5f17;}
+  label.fld{display:block;font-size:13px;color:var(--muted);margin:14px 0 4px;
+            text-transform:uppercase;letter-spacing:.03em;}
+  select,input[type=text],textarea{
+    width:100%;font-size:17px;font-family:inherit;padding:12px;
+    border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);
+  }
+  textarea{font-size:16px;min-height:72px;}
+  .slider{display:flex;align-items:center;gap:10px;margin-top:8px;}
+  .slider .lbl{font-size:13px;color:var(--muted);width:54px;}
+  .slider input{flex:1;}
+  .slider .val{width:38px;text-align:right;font-size:14px;}
+  .btn{display:block;width:100%;font-family:inherit;font-size:18px;font-weight:600;
+       padding:14px;border:none;border-radius:12px;background:var(--gold);color:#1d1500;
+       margin-top:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  .btn:active{filter:brightness(.92);}
+  .btn.secondary{background:#efe9dc;color:#5a4a1f;}
+  .cand{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;
+        text-align:left;font-family:inherit;border:1px solid var(--line);border-radius:12px;
+        background:#fff;color:var(--ink);padding:12px 14px;margin-top:8px;cursor:pointer;
+        -webkit-tap-highlight-color:transparent;}
+  .cand:active{background:var(--soft);}
+  .cand .str{font-size:20px;font-weight:700;}
+  .cand .note{font-size:13px;color:var(--muted);margin-top:2px;}
+  .cand.live{border-color:var(--gold);background:var(--soft);}
+  .play{flex:none;font-size:16px;font-weight:700;color:var(--gold);}
+  .toggle{display:flex;align-items:center;gap:10px;margin:16px 0 0;font-size:15px;}
+  .toggle input{width:22px;height:22px;}
+  .lastspoke{margin-top:16px;font-size:14px;color:var(--muted);min-height:20px;}
+  .lastspoke b{color:var(--ink);}
+  details summary{cursor:pointer;color:var(--gold);font-weight:600;font-size:14px;margin-top:16px;}
+  details p{font-size:13px;color:var(--muted);}
+  .footer{margin-top:32px;font-size:12px;color:#9a9a9a;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>🔊 &ldquo;Nilsson&rdquo; pronunciation sandbox</h1>
+  <p class="lede">A throwaway test page &mdash; not the real app, and not connected to it. Tap any spelling to hear how your phone&rsquo;s voice says it.</p>
+
+  <div class="goal">
+    <b>Goal:</b> <b>NILL-sun</b> &mdash; short &ldquo;i&rdquo; like in <i>nil</i> (not &ldquo;NEEL&rdquo;), with the emphasis on the <b>FIRST</b> part (not &ldquo;nill-SUN&rdquo;). Tap around, find the closest one, and tell Claude which spelling won.
+  </div>
+
+  <label class="fld" for="voice">Voice &mdash; the app uses your phone&rsquo;s default; try others here</label>
+  <select id="voice"></select>
+
+  <label class="toggle"><input type="checkbox" id="fullname"> Say the full name (&ldquo;Isabella &hellip;&rdquo;) for a realistic test</label>
+
+  <h2>Type anything</h2>
+  <input type="text" id="free" placeholder="e.g. n&iacute;ll sun" autocapitalize="off" autocorrect="off" spellcheck="false">
+  <button class="btn" id="speakFree">&#9654; Speak this</button>
+  <button class="btn secondary" id="stop">&#9632; Stop</button>
+
+  <div id="candidates"></div>
+
+  <div class="lastspoke" id="lastspoke"></div>
+
+  <details>
+    <summary>Adjust speed / pitch (optional)</summary>
+    <div class="slider"><span class="lbl">Speed</span><input type="range" id="rate" min="0.5" max="1.2" step="0.05" value="1"><span class="val" id="rateVal">1.0</span></div>
+    <div class="slider"><span class="lbl">Pitch</span><input type="range" id="pitch" min="0.5" max="1.5" step="0.05" value="1"><span class="val" id="pitchVal">1.0</span></div>
+    <p>Defaults (1.0 / 1.0) match the real app. Slowing the speed can make it easier to hear which part is emphasized. Re-tap a spelling after changing these.</p>
+  </details>
+
+  <details>
+    <summary>Advanced: does this voice support SSML emphasis tags?</summary>
+    <p>This rules an idea in or out. Tap below to attempt an SSML &ldquo;strong emphasis&rdquo; on <i>nill</i>. If you hear the voice read the angle-bracket tags out loud (&ldquo;speak emphasis level strong&hellip;&rdquo;), that means your phone ignores SSML (expected on iPhone) and we can cross this approach off.</p>
+    <button class="btn secondary" id="ssml">&#9654; Try SSML emphasis</button>
+  </details>
+
+  <h2>Notes (so you remember what to tell Claude)</h2>
+  <textarea id="notes" placeholder="e.g. &lsquo;n&iacute;ll sun&rsquo; on the Samantha voice sounded closest&hellip;"></textarea>
+
+  <div class="footer">Sandbox page &bull; not the Voice Email Reader &bull; built by Claude</div>
+</div>
+
+<script>
+  var synth = window.speechSynthesis;
+  var voices = [];
+  var voiceSel = document.getElementById('voice');
+  var rate = document.getElementById('rate'), pitch = document.getElementById('pitch');
+  var rateVal = document.getElementById('rateVal'), pitchVal = document.getElementById('pitchVal');
+  var fullname = document.getElementById('fullname');
+  var lastspoke = document.getElementById('lastspoke');
+
+  function loadVoices(){
+    voices = synth.getVoices() || [];
+    var en = voices.filter(function(v){return /^en/i.test(v.lang);}).sort(function(a,b){return a.name.localeCompare(b.name);});
+    var other = voices.filter(function(v){return !/^en/i.test(v.lang);}).sort(function(a,b){return a.name.localeCompare(b.name);});
+    var ordered = en.concat(other);
+    var keep = voiceSel.value;
+    voiceSel.innerHTML = '';
+    var def = document.createElement('option');
+    def.value = ''; def.textContent = "App default (phone's default voice)";
+    voiceSel.appendChild(def);
+    ordered.forEach(function(v){
+      var o = document.createElement('option');
+      o.value = v.name;
+      o.textContent = v.name + ' — ' + v.lang + (v.default ? ' (default)' : '');
+      voiceSel.appendChild(o);
+    });
+    if(keep){ voiceSel.value = keep; }
+  }
+  loadVoices();
+  if (typeof synth.onvoiceschanged !== 'undefined') synth.onvoiceschanged = loadVoices;
+  setTimeout(loadVoices, 400); // iOS sometimes populates voices late
+
+  rate.addEventListener('input', function(){ rateVal.textContent = parseFloat(rate.value).toFixed(2); });
+  pitch.addEventListener('input', function(){ pitchVal.textContent = parseFloat(pitch.value).toFixed(2); });
+
+  function speak(str){
+    if(!str) return;
+    synth.cancel();
+    var out = (fullname.checked ? 'Isabella ' : '') + str;
+    var u = new SpeechSynthesisUtterance(out);
+    u.rate = parseFloat(rate.value);
+    u.pitch = parseFloat(pitch.value);
+    u.volume = 1.0;
+    var name = voiceSel.value;
+    if(name){ var v = voices.find(function(x){return x.name === name;}); if(v) u.voice = v; }
+    synth.speak(u);
+    // Chrome/mobile bug workaround, same as the real app
+    setTimeout(function(){ if(synth.paused) synth.resume(); }, 100);
+    lastspoke.innerHTML = 'Last spoken: <b>&ldquo;' + out.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '&rdquo;</b>';
+  }
+
+  document.getElementById('speakFree').addEventListener('click', function(){
+    speak(document.getElementById('free').value.trim());
+  });
+  document.getElementById('stop').addEventListener('click', function(){ synth.cancel(); });
+  document.getElementById('ssml').addEventListener('click', function(){
+    speak('<speak><emphasis level="strong">nill</emphasis> sun</speak>');
+  });
+
+  var GROUPS = [
+    { title: 'Current & reference (already tried)', items: [
+      { str: 'nill sun',  live: true, note: 'CURRENT LIVE — right vowel, emphasis a touch late (nill-SUN)' },
+      { str: 'Nilson',    note: 'one word — came out NEEL-son (wrong vowel, but right emphasis)' },
+      { str: 'NILL-sun',  note: 'hyphen + caps — came out nill-SUN' }
+    ]},
+    { title: 'New idea 1 — accent mark to pull emphasis to the FIRST part (keep it split)', items: [
+      { str: 'níll sun',  note: 'acute accent on first vowel + space' },
+      { str: 'níll-sun',  note: 'acute accent + hyphen' },
+      { str: 'nìll sun',  note: 'grave accent variant' }
+    ]},
+    { title: 'New idea 2 — accent on a one-word form (short "i" AND first-part emphasis?)', items: [
+      { str: 'níllson',  note: 'one word + acute accent' },
+      { str: 'níllsun',  note: 'one word + acute accent, phonetic ending' }
+    ]},
+    { title: 'New idea 3 — a punctuation break to push the accent onto "nill"', items: [
+      { str: 'nill, sun',  note: 'comma — may add a tiny pause' },
+      { str: 'nill. sun',  note: 'period — makes "nill" its own little sentence' }
+    ]},
+    { title: 'New idea 4 — different vowel spelling to dodge the "NEEL" one-word trap', items: [
+      { str: 'nyllson',  note: '"ny-" may avoid the Scandinavian long-ee' },
+      { str: 'nyll sun', note: '"ny-" in split form' }
+    ]},
+    { title: 'New idea 5 — phonetic primary-stress mark (some voices honor it)', items: [
+      { str: 'ˈnill sun', note: 'IPA stress mark before "nill" + space' },
+      { str: 'ˈnillson',  note: 'stress mark + one word' }
+    ]}
+  ];
+
+  var container = document.getElementById('candidates');
+  GROUPS.forEach(function(g){
+    var h = document.createElement('h2'); h.textContent = g.title; container.appendChild(h);
+    g.items.forEach(function(it){
+      var b = document.createElement('button');
+      b.className = 'cand' + (it.live ? ' live' : '');
+      var wrap = document.createElement('span');
+      var s = document.createElement('span'); s.className = 'str'; s.textContent = it.str;
+      var n = document.createElement('span'); n.className = 'note'; n.style.display = 'block'; n.textContent = it.note;
+      wrap.appendChild(s); wrap.appendChild(n);
+      var p = document.createElement('span'); p.className = 'play'; p.textContent = '▶';
+      b.appendChild(wrap); b.appendChild(p);
+      b.addEventListener('click', function(){ speak(it.str); });
+      container.appendChild(b);
+    });
+  });
+</script>
+</body>
+</html>
