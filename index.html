@@ -671,7 +671,7 @@
         const LIC_PRONUNCIATION_REPLACEMENTS = {
             'Blome': 'Bloom',  // say "Bloom", not "Blome"
             'USA': 'U. S. A.',  // spell out the letters, don't say "oosa"
-            'Nilsson': 'Nihlsun'  // respelled by ear for iOS TTS. Goal: "NILL-sun" — short "i", stress on first syllable. "ih" spelling pushes the voice toward a short "i" (was saying "NEEL"); one word keeps the stress up front. Not "nill-SUN" or "NEEL-sun".
+            'Nilsson': 'Nilson'  // respelled as "Wilson" with an N — same letter pattern as the name the iOS voice reliably says "WIL-son". Goal: "NILL-sun" (short "i", stress on first syllable). Double-L / "ih" spellings (Nillson, Nillsun, Nihlsun) looked foreign and made the voice say "NEEL".
         };
 
         function applyLICDictionary(text, dictionary) {
