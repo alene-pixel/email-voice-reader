@@ -671,7 +671,7 @@
         const LIC_PRONUNCIATION_REPLACEMENTS = {
             'Blome': 'Bloom',  // say "Bloom", not "Blome"
             'USA': 'U. S. A.',  // spell out the letters, don't say "oosa"
-            'Nilsson': 'Nill-suhn'  // iOS TTS, tuned by ear. "Nill" (hyphenated) finally produces the short "i" — do NOT change "Nill" or drop the hyphen. 2nd syllable spelled "suhn" (a schwa/"uh" vowel) so it stays UNSTRESSED and the emphasis falls on the FIRST syllable. Goal: "NILL-suhn". History: "-sun" (full vowel) pulled stress to the 2nd syllable ("nill-SUN"); every one-word spelling (Nilson, Nillson, Nillsun, Nihlsun) came out "NEEL".
+            'Nilsson': 'Nill-son'  // iOS TTS, tuned by ear. MUST stay hyphenated — every one-word spelling (Nilson, Nillson, Nihlsun) came out "NEEL". "Nill-" (hyphenated, double-L) gives the short "i" — do NOT change it or drop the hyphen. 2nd syllable "-son" is a real surname suffix the voice tends to de-accent (as in Wilson/Nelson), aiming to pull the emphasis onto the FIRST syllable. Goal: "NILL-son". Hard part: the voice likes to stress the LAST syllable of a hyphen pair ("nill-SUN") and "-suhn"/"-sun" spellings didn't move it; spelling gives limited control over emphasis.
         };
 
         function applyLICDictionary(text, dictionary) {
