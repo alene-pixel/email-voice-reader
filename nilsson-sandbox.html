@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nilsson pronunciation sandbox</title>
+<title>Nilsson pronunciation sandbox (in-context)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -26,8 +26,9 @@
      margin:26px 0 8px;border-bottom:2px solid var(--gold);padding-bottom:5px;}
   p.lede{color:var(--muted);margin:0 0 14px;font-size:15px;}
   .goal{background:var(--soft);border:1px solid var(--gold);border-radius:10px;
-        padding:12px 14px;margin:12px 0 18px;font-size:15px;}
+        padding:12px 14px;margin:12px 0 16px;font-size:15px;}
   .goal b{color:#7a5f17;}
+  .how{background:#f4f7f4;border:1px solid #cfe0cf;border-radius:10px;padding:11px 13px;margin:0 0 16px;font-size:14px;color:#3c513c;}
   label.fld{display:block;font-size:13px;color:var(--muted);margin:14px 0 4px;
             text-transform:uppercase;letter-spacing:.03em;}
   select,input[type=text],textarea{
@@ -35,6 +36,10 @@
     border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);
   }
   textarea{font-size:16px;min-height:72px;}
+  .presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+  .presets button{font-family:inherit;font-size:13px;border:1px solid var(--line);background:#fff;color:var(--muted);
+                  border-radius:20px;padding:6px 11px;cursor:pointer;}
+  .presets button:active{background:var(--soft);}
   .slider{display:flex;align-items:center;gap:10px;margin-top:8px;}
   .slider .lbl{font-size:13px;color:var(--muted);width:54px;}
   .slider input{flex:1;}
@@ -51,11 +56,10 @@
   .cand:active{background:var(--soft);}
   .cand .str{font-size:20px;font-weight:700;}
   .cand .note{font-size:13px;color:var(--muted);margin-top:2px;}
-  .cand.live{border-color:var(--gold);background:var(--soft);}
+  .cand.star{border-color:var(--gold);background:var(--soft);}
   .play{flex:none;font-size:16px;font-weight:700;color:var(--gold);}
-  .toggle{display:flex;align-items:center;gap:10px;margin:16px 0 0;font-size:15px;}
-  .toggle input{width:22px;height:22px;}
-  .lastspoke{margin-top:16px;font-size:14px;color:var(--muted);min-height:20px;}
+  .lastspoke{margin-top:16px;font-size:14px;color:var(--muted);min-height:22px;
+             background:#fafafa;border:1px solid var(--line);border-radius:8px;padding:10px 12px;}
   .lastspoke b{color:var(--ink);}
   details summary{cursor:pointer;color:var(--gold);font-weight:600;font-size:14px;margin-top:16px;}
   details p{font-size:13px;color:var(--muted);}
@@ -65,42 +69,46 @@
 <body>
 <div class="wrap">
 
-  <h1>🔊 &ldquo;Nilsson&rdquo; pronunciation sandbox</h1>
-  <p class="lede">A throwaway test page &mdash; not the real app, and not connected to it. Tap any spelling to hear how your phone&rsquo;s voice says it.</p>
+  <h1>🔊 &ldquo;Nilsson&rdquo; sandbox <span style="font-size:13px;color:var(--muted);font-weight:normal;">(in-context, v2)</span></h1>
+  <p class="lede">A throwaway test page &mdash; not the real app. This version speaks each spelling <b>inside a full sentence</b>, run through the app&rsquo;s exact speech steps, so what you hear here matches the real app.</p>
 
   <div class="goal">
-    <b>Goal:</b> <b>NILL-sun</b> &mdash; short &ldquo;i&rdquo; like in <i>nil</i> (not &ldquo;NEEL&rdquo;), with the emphasis on the <b>FIRST</b> part (not &ldquo;nill-SUN&rdquo;). Tap around, find the closest one, and tell Claude which spelling won.
+    <b>Goal:</b> <b>NILL-sun</b> &mdash; short &ldquo;i&rdquo; like in <i>nil</i> (not &ldquo;NEEL&rdquo;), emphasis on the <b>FIRST</b> part (not &ldquo;nill-SUN&rdquo; or &ldquo;neel-SUN&rdquo;). Tap a spelling, listen to the whole sentence, and tell Claude which one wins.
   </div>
 
-  <label class="fld" for="voice">Voice &mdash; the app uses your phone&rsquo;s default; try others here</label>
+  <div class="how">
+    <b>Why v2:</b> the first sandbox spoke the name on its own, so it sounded right &mdash; but the real app says the name in the <i>middle</i> of a sentence, which changed everything. This version says a full sentence (like a real email) so the test is honest.
+  </div>
+
+  <label class="fld" for="template">The test sentence (the word &ldquo;Nilsson&rdquo; gets swapped for each spelling)</label>
+  <input type="text" id="template" value="Isabella Nilsson is the Equal Justice Works fellow." autocapitalize="off" autocorrect="off" spellcheck="false">
+  <div class="presets">
+    <button data-t="Isabella Nilsson is the Equal Justice Works fellow.">name in the middle</button>
+    <button data-t="Please give a warm welcome to Isabella Nilsson.">name at the end</button>
+    <button data-t="Isabella Nilsson, our fellow, sent the email.">name before a comma</button>
+  </div>
+
+  <label class="fld" for="voice">Voice &mdash; the app uses your phone&rsquo;s default; keep it on &ldquo;App default&rdquo; for a true test</label>
   <select id="voice"></select>
 
-  <label class="toggle"><input type="checkbox" id="fullname"> Say the full name (&ldquo;Isabella &hellip;&rdquo;) for a realistic test</label>
-
-  <h2>Type anything</h2>
-  <input type="text" id="free" placeholder="e.g. n&iacute;ll sun" autocapitalize="off" autocorrect="off" spellcheck="false">
-  <button class="btn" id="speakFree">&#9654; Speak this</button>
+  <h2>Type any spelling</h2>
+  <input type="text" id="free" placeholder="e.g. Nill&rsquo;s son" autocapitalize="off" autocorrect="off" spellcheck="false">
+  <button class="btn" id="speakFree">&#9654; Speak it in the sentence</button>
   <button class="btn secondary" id="stop">&#9632; Stop</button>
 
   <div id="candidates"></div>
 
-  <div class="lastspoke" id="lastspoke"></div>
+  <div class="lastspoke" id="lastspoke">Tap any spelling above to hear the full sentence.</div>
 
   <details>
     <summary>Adjust speed / pitch (optional)</summary>
     <div class="slider"><span class="lbl">Speed</span><input type="range" id="rate" min="0.5" max="1.2" step="0.05" value="1"><span class="val" id="rateVal">1.0</span></div>
     <div class="slider"><span class="lbl">Pitch</span><input type="range" id="pitch" min="0.5" max="1.5" step="0.05" value="1"><span class="val" id="pitchVal">1.0</span></div>
-    <p>Defaults (1.0 / 1.0) match the real app. Slowing the speed can make it easier to hear which part is emphasized. Re-tap a spelling after changing these.</p>
-  </details>
-
-  <details>
-    <summary>Advanced: does this voice support SSML emphasis tags?</summary>
-    <p>This rules an idea in or out. Tap below to attempt an SSML &ldquo;strong emphasis&rdquo; on <i>nill</i>. If you hear the voice read the angle-bracket tags out loud (&ldquo;speak emphasis level strong&hellip;&rdquo;), that means your phone ignores SSML (expected on iPhone) and we can cross this approach off.</p>
-    <button class="btn secondary" id="ssml">&#9654; Try SSML emphasis</button>
+    <p>Defaults (1.0 / 1.0) match the real app. Slowing the speed can make it easier to hear which part is emphasized.</p>
   </details>
 
   <h2>Notes (so you remember what to tell Claude)</h2>
-  <textarea id="notes" placeholder="e.g. &lsquo;n&iacute;ll sun&rsquo; on the Samantha voice sounded closest&hellip;"></textarea>
+  <textarea id="notes" placeholder="e.g. &lsquo;Nill&rsquo;s son&rsquo; sounded like NILL-sun in all three sentences&hellip;"></textarea>
 
   <div class="footer">Sandbox page &bull; not the Voice Email Reader &bull; built by Claude</div>
 </div>
@@ -109,10 +117,39 @@
   var synth = window.speechSynthesis;
   var voices = [];
   var voiceSel = document.getElementById('voice');
+  var templateInput = document.getElementById('template');
   var rate = document.getElementById('rate'), pitch = document.getElementById('pitch');
   var rateVal = document.getElementById('rateVal'), pitchVal = document.getElementById('pitchVal');
-  var fullname = document.getElementById('fullname');
   var lastspoke = document.getElementById('lastspoke');
+
+  // ---- Copied verbatim from the app (index.html) so the sandbox matches it exactly ----
+  function formatTextForSpeech(text){
+    text = text.replace(/\b([A-Z0-9._%+-]+)@([A-Z0-9.-]+\.[A-Z]{2,})\b/gi, function(match, local, domain){
+      var localPart = local.replace(/\./g, ' dot ');
+      var domainPart = domain.replace(/\./g, ' dot ');
+      return localPart + ' at ' + domainPart;
+    });
+    text = text.replace(/\b([A-Z0-9](?:[A-Z0-9-]*[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]*[A-Z0-9])?)*)\.([A-Z]{2,})\b/gi, function(match){
+      return match.replace(/\./g, ' dot ');
+    });
+    return text;
+  }
+  function splitIntoSentences(text){
+    var sentences = text.match(/[^.!?]+[.!?]+[\s]*/g) || [text];
+    return sentences.map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 0; });
+  }
+  function applyLICDictionary(text, dictionary){
+    if(!text) return text;
+    var result = text;
+    for(var key in dictionary){
+      var value = dictionary[key];
+      var escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      var pattern = new RegExp('\\b' + escaped + '\\b', 'gi');
+      result = result.replace(pattern, value);
+    }
+    return result;
+  }
+  // -------------------------------------------------------------------------------------
 
   function loadVoices(){
     voices = synth.getVoices() || [];
@@ -134,68 +171,74 @@
   }
   loadVoices();
   if (typeof synth.onvoiceschanged !== 'undefined') synth.onvoiceschanged = loadVoices;
-  setTimeout(loadVoices, 400); // iOS sometimes populates voices late
+  setTimeout(loadVoices, 400);
 
   rate.addEventListener('input', function(){ rateVal.textContent = parseFloat(rate.value).toFixed(2); });
   pitch.addEventListener('input', function(){ pitchVal.textContent = parseFloat(pitch.value).toFixed(2); });
 
-  function speak(str){
-    if(!str) return;
+  document.querySelectorAll('.presets button').forEach(function(b){
+    b.addEventListener('click', function(){ templateInput.value = b.getAttribute('data-t'); });
+  });
+
+  // Speak ONE utterance, exactly like the app's speakChunk (rate/pitch 1.0, paused-resume workaround)
+  function speakChunk(speechText){
+    return new Promise(function(resolve){
+      var u = new SpeechSynthesisUtterance(speechText);
+      u.rate = parseFloat(rate.value);
+      u.pitch = parseFloat(pitch.value);
+      u.volume = 1.0;
+      var name = voiceSel.value;
+      if(name){ var v = voices.find(function(x){return x.name === name;}); if(v) u.voice = v; }
+      u.onend = function(){ resolve(); };
+      u.onerror = function(){ resolve(); };
+      synth.speak(u);
+      setTimeout(function(){ if(synth.paused) synth.resume(); }, 100);
+    });
+  }
+
+  // Speak the test sentence with "Nilsson" swapped for `candidate`, following the app's pipeline
+  async function speakCandidate(candidate){
+    if(!candidate) return;
     synth.cancel();
-    var out = (fullname.checked ? 'Isabella ' : '') + str;
-    var u = new SpeechSynthesisUtterance(out);
-    u.rate = parseFloat(rate.value);
-    u.pitch = parseFloat(pitch.value);
-    u.volume = 1.0;
-    var name = voiceSel.value;
-    if(name){ var v = voices.find(function(x){return x.name === name;}); if(v) u.voice = v; }
-    synth.speak(u);
-    // Chrome/mobile bug workaround, same as the real app
-    setTimeout(function(){ if(synth.paused) synth.resume(); }, 100);
-    lastspoke.innerHTML = 'Last spoken: <b>&ldquo;' + out.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '&rdquo;</b>';
+    await new Promise(function(r){ setTimeout(r, 100); });
+    var raw = templateInput.value || 'Isabella Nilsson is the Equal Justice Works fellow.';
+    if(!/Nilsson/i.test(raw)){
+      lastspoke.innerHTML = '<b>Heads up:</b> your test sentence needs the word <b>&ldquo;Nilsson&rdquo;</b> in it &mdash; that&rsquo;s what gets swapped for the spelling.';
+      return;
+    }
+    var text = formatTextForSpeech(raw);
+    var sentences = splitIntoSentences(text);
+    var dict = { 'Nilsson': candidate };
+    var spoken = [];
+    for(var i=0;i<sentences.length;i++){
+      var speechText = applyLICDictionary(sentences[i], dict);
+      spoken.push(speechText);
+      await speakChunk(speechText);
+    }
+    var shown = spoken.join(' ').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    lastspoke.innerHTML = 'Spoken just now (exactly as the app would): <b>&ldquo;' + shown + '&rdquo;</b>';
   }
 
   document.getElementById('speakFree').addEventListener('click', function(){
-    speak(document.getElementById('free').value.trim());
+    speakCandidate(document.getElementById('free').value.trim());
   });
   document.getElementById('stop').addEventListener('click', function(){ synth.cancel(); });
-  document.getElementById('ssml').addEventListener('click', function(){
-    speak('<speak><emphasis level="strong">nill</emphasis> sun</speak>');
-  });
 
   var GROUPS = [
-    { title: 'Current & reference (already tried)', items: [
-      { str: 'nill sun',  live: true, note: 'CURRENT LIVE — right vowel, emphasis a touch late (nill-SUN)' },
-      { str: 'Nilson',    note: 'one word — came out NEEL-son (wrong vowel, but right emphasis)' },
-      { str: 'NILL-sun',  note: 'hyphen + caps — came out nill-SUN' }
+    { title: "Isabella's idea — \"Nill's son\" (Nilsson = \"Nils's son\")", items: [
+      { str: "Nill's son", star: true, note: 'possessive — English stress naturally falls on "NILL’s"' },
+      { str: "Nil's son",  note: 'single L (like the word "nil") + possessive' },
+      { str: "nills son",  note: 'no apostrophe' },
+      { str: "Nils son",   note: 'literal roots (Nils + son) — listen for "neelz" vs "nilz"' }
     ]},
-    { title: 'New idea 1 — accent mark to pull emphasis to the FIRST part (keep it split)', items: [
-      { str: 'níll sun',  note: 'acute accent on first vowel + space' },
-      { str: 'níll-sun',  note: 'acute accent + hyphen' },
-      { str: 'nìll sun',  note: 'grave accent variant' }
+    { title: 'Reference — tap these to confirm the sandbox now matches the app', items: [
+      { str: 'nill sun',  note: 'current live in the app — should sound "nill-SUN"' },
+      { str: 'nill. sun', note: 'the period form — should now sound "neel-SUN" HERE too (the bug, reproduced)' },
+      { str: 'Nilson',    note: 'one word — should sound "NEEL-son"' }
     ]},
-    { title: 'New idea 2 — accent on a one-word form (short "i" AND first-part emphasis?)', items: [
-      { str: 'níllson',  note: 'one word + acute accent' },
-      { str: 'níllsun',  note: 'one word + acute accent, phonetic ending' }
-    ]},
-    { title: 'New idea 3 — a punctuation break to push the accent onto "nill"', items: [
-      { str: 'nill, sun',  note: 'comma — may add a tiny pause' },
-      { str: 'nill. sun',  note: 'period — makes "nill" its own little sentence' }
-    ]},
-    { title: 'New idea 4 — different vowel spelling to dodge the "NEEL" one-word trap', items: [
-      { str: 'nyllson',  note: '"ny-" may avoid the Scandinavian long-ee' },
-      { str: 'nyll sun', note: '"ny-" in split form' }
-    ]},
-    { title: 'New idea 5 — phonetic primary-stress mark (some voices honor it)', items: [
-      { str: 'ˈnill sun', note: 'IPA stress mark before "nill" + space' },
-      { str: 'ˈnillson',  note: 'stress mark + one word' }
-    ]},
-    { title: 'New idea 6 — drag out the first syllable (your idea: extra letters for length)', items: [
-      { str: 'nilll sun',     note: '3 Ls, one i — holds the L longer, keeps the short vowel' },
-      { str: 'nillll sun',    note: '4 Ls — longer hold on the first part' },
-      { str: 'nilllll sun',   note: '5 Ls — even longer; does the emphasis move forward?' },
-      { str: 'nilllll-sun',   note: '5 Ls with a hyphen' },
-      { str: 'niiilllll sun', note: 'extra i AND l letters (your literal version) — listen for the vowel slipping back to long "ee"' }
+    { title: 'Other shapes worth a listen in context', items: [
+      { str: 'nyll son',  note: 'alt vowel spelling + "son"' },
+      { str: 'nilll sun', note: 'drag out the L' }
     ]}
   ];
 
@@ -204,14 +247,14 @@
     var h = document.createElement('h2'); h.textContent = g.title; container.appendChild(h);
     g.items.forEach(function(it){
       var b = document.createElement('button');
-      b.className = 'cand' + (it.live ? ' live' : '');
+      b.className = 'cand' + (it.star ? ' star' : '');
       var wrap = document.createElement('span');
       var s = document.createElement('span'); s.className = 'str'; s.textContent = it.str;
       var n = document.createElement('span'); n.className = 'note'; n.style.display = 'block'; n.textContent = it.note;
       wrap.appendChild(s); wrap.appendChild(n);
       var p = document.createElement('span'); p.className = 'play'; p.textContent = '▶';
       b.appendChild(wrap); b.appendChild(p);
-      b.addEventListener('click', function(){ speak(it.str); });
+      b.addEventListener('click', function(){ speakCandidate(it.str); });
       container.appendChild(b);
     });
   });
