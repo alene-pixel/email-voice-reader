@@ -4,6 +4,12 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-06-16 — Pronounce "Nilsson" with a short "i" (vowel fixed; emphasis tuning ongoing)
+
+**Summary**: Added `'Nilsson': 'nill sun'` to `LIC_PRONUNCIATION_REPLACEMENTS` so the TTS reader says Isabella Nilsson's surname with a short "i" ("nill," like "pill") instead of the long-"ee" "NEEL-son" the iOS voice defaulted to. The vowel is now correct; the emphasis still lands on the 2nd syllable ("nill-SUN") rather than the 1st ("NILL-sun"). Across roughly nine respellings we found the voice trades the two off: any one-word spelling gives the right stress but the wrong vowel, while a hyphen or space gives the right vowel but stresses the last syllable. The current spelling favors the correct vowel, which Alene prioritized. Full attempt log, diagnosis, and untried ideas for a future session live in the 2026-06-16 entry of KNOWN-ISSUES.md. Displayed email text is unchanged; only the spoken pronunciation changes.
+
+---
+
 ## 2026-06-12 — Pronounce "USA" as "U. S. A."
 
 **Summary**: Added `'USA': 'U. S. A.'` to `LIC_PRONUNCIATION_REPLACEMENTS` so the TTS reader spells out the letters instead of saying "oosa." Safe with sentence chunking: the substitution runs inside `speakChunk`, after `splitIntoSentences` has already split the text, so the periods in "U. S. A." never act as sentence boundaries. Displayed text still reads "USA"; only the spoken pronunciation changes.
