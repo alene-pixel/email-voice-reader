@@ -2558,7 +2558,7 @@
                     },
                     {
                         id: 'edit', icon: '✏️', label: 'Edit',
-                        voiceMatch: (cmd) => cmd.includes('edit'),
+                        voiceMatch: (cmd) => cmd.includes('edit') || cmd.includes('fedex') || cmd.includes('fed ex'),
                         isAvailable: () => m.state === 'confirming-send',
                         execute: () => this.resolvePending('edit')
                     },

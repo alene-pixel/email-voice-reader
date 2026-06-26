@@ -4,6 +4,12 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-06-25 — "FedEx" now triggers the Edit command (speech-recognition variant)
+
+**Summary**: Speech recognition was mis-hearing Alene's spoken "edit" as "FedEx" on the send-confirmation screen. Added `fedex` and `fed ex` to the Edit command's `voiceMatch` so both spellings (one word or two, depending on how the recognizer splits it) now route to Edit. Same approach the app already uses for other mis-hearings (e.g., the Spam command matching "marcus spam" / "marcus van," Archive matching "are by" / "barberry"). Display and behavior are otherwise unchanged.
+
+---
+
 ## 2026-06-16 — Revert "Nilsson" to "nill sun" (period form regressed in the real app)
 
 **Summary**: Reverted `'Nilsson'` from `'nill. sun'` back to `'nill sun'`. The period form had tested as "NILL-sun" in the standalone sandbox, but once live the app read it as "neel-SUN" — the worst of both worlds (wrong vowel AND wrong stress). Per the app's "revert failed fixes completely" rule, restored the prior `'nill sun'` (short "i," stress slightly late), the best in-app result so far. The entry just below — which announced the period fix — is left in place as the honest record of what was tried; this entry supersedes it.
