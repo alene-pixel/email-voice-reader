@@ -3369,8 +3369,14 @@
                 const unseenEmails = newEmails.filter(e => !seenIds.has(e.id));
 
                 if (unseenEmails.length > 0) {
-                    this.model.setEmails(unseenEmails);
-                    this.model.setCurrentEmailIndex(0);
+                    // Append the new batch onto the emails already read this session,
+                    // instead of replacing them. Keeping the previous batch in memory
+                    // lets "previous" still work on the first email of the new batch —
+                    // it steps back to the last email of the last batch. (It also makes
+                    // de-duplication reliable across batches, so no email is re-read.)
+                    const firstNewIndex = this.model.emails.length;
+                    this.model.setEmails(this.model.emails.concat(unseenEmails));
+                    this.model.setCurrentEmailIndex(firstNewIndex);
                     this.model.setState('reading');
                     await this.speech.speak(`Found ${unseenEmails.length} more unread emails. Continuing.`);
                     this.readCurrentEmail();

@@ -4,6 +4,16 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-07-07 — "Previous" now works across a batch boundary (back into the last batch)
+
+**Summary**: When the reader finished a batch (~10 emails) and fetched the next one, "previous" stopped working on the first email of the new batch and the Previous button disappeared — there was no way to step back to the last email of the prior batch. Fixed by having `checkForMoreEmails()` **append** the newly-fetched batch onto the emails already read this session (and point the position at the first new email) instead of **replacing** the whole list and resetting the position to 0. Now the prior batch stays in memory, so `canGoPrevious` is true on the first email of a new batch and "previous"/⏮️ steps back to the last email of the last batch; "next" then returns forward as expected. Reported by Alene.
+
+**Root cause**: `checkForMoreEmails()` did `setEmails(unseenEmails)` + `setCurrentEmailIndex(0)`. That discarded the finished batch and reset the index, so `canGoPrevious` (`currentEmailIndex > 0`) was false and the Previous command's `isAvailable` returned false, hiding the button. The change computes `firstNewIndex = this.model.emails.length` before growing the array, then `setEmails(this.model.emails.concat(unseenEmails))` and `setCurrentEmailIndex(firstNewIndex)`.
+
+**Bonus fix**: de-duplication is now reliable across batches. `seenIds` is built from `this.model.emails`, which previously held only the latest batch; an unread email left un-acted-upon in an earlier batch could reappear as "unseen" and be re-read. With the full session history retained, `seenIds` covers everything already seen, so no email is read twice. Verified with a `node --check` syntax pass on both inline scripts and a navigation simulation across a batch boundary.
+
+---
+
 ## 2026-06-25 — "FedEx" now triggers the Edit command (speech-recognition variant)
 
 **Summary**: Speech recognition was mis-hearing Alene's spoken "edit" as "FedEx" on the send-confirmation screen. Added `fedex` and `fed ex` to the Edit command's `voiceMatch` so both spellings (one word or two, depending on how the recognizer splits it) now route to Edit. Same approach the app already uses for other mis-hearings (e.g., the Spam command matching "marcus spam" / "marcus van," Archive matching "are by" / "barberry"). Display and behavior are otherwise unchanged.
