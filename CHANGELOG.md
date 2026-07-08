@@ -4,6 +4,23 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-07-07 — Ignore an accidental repeat of a voice command (fixes the "did it twice" bug)
+
+**Summary**: On iPhone there is a delay between when Alene speaks and when the app reacts (root cause in KNOWN-ISSUES.md, 2026-07-07 entry — inherent to iOS speech recognition, not fixable here). During that delay the app keeps reading, so Alene often thinks it did not hear her and repeats the command. The first command then ran on the intended email AND the repeat ran on the NEXT email — e.g. archiving an email she never meant to touch. Now, if the app hears the **same** command again within a short window after running it, it treats the repeat as accidental and ignores it. This is the voice analog of the existing button double-tap guard (`buttonsLockedUntil`).
+
+**How it works**:
+- The controller remembers the id and timestamp of the last voice command it actually ran (`lastExecutedCommandId` / `lastExecutedCommandTime`, set in `handleCommand`).
+- A new pure pre-check, `shouldSuppressRepeat(spokenCommand)`, returns true when the spoken words map to the SAME command id within `repeatCommandWindowMs` (default **3000 ms**, matching the existing post-dictation `commandCooldown`). It matches the same first-`voiceMatch`-wins way `handleCommand` does, so the id it compares is exactly the command that would otherwise run.
+- `SpeechService.onresult` (command mode) calls this pre-check **before** `this.cancel()`. On a suppressed repeat it returns early — so it neither routes the command nor cancels the email currently being read. The email keeps playing instead of the app falling silent (which was part of why the delay felt broken). Wired via the new `speech.onCommandShouldSuppress` callback.
+
+**Scope / keying**: Suppression is keyed on the command **id**, so only an identical repeat is dropped; a *different* command said right after (e.g. "archive" then "stop") always goes through. Applies to every voice command uniformly. For navigation this is the desired behavior too: saying "next" twice during the delay now skips one email (hear the next) instead of skipping two (blowing past an unheard email). Confirmation-flow commands (yes/no/send/edit) are naturally unaffected because acting on them changes state so the same id is no longer available. On-screen button taps are untouched — they already have `buttonsLockedUntil`.
+
+**Tuning**: `repeatCommandWindowMs` is a single constant in the controller constructor. Shrink it if it ever eats an *intended* quick repeat; grow it if doubles still slip through when Alene waits longer before repeating. Cannot be tested on iOS timing from Claude's side — empirical, like the Nilsson pronunciation loop. Verified with a `node --check` syntax pass on the main inline script.
+
+**Reported by**: Alene.
+
+---
+
 ## 2026-07-07 — "Previous" now works across a batch boundary (back into the last batch)
 
 **Summary**: When the reader finished a batch (~10 emails) and fetched the next one, "previous" stopped working on the first email of the new batch and the Previous button disappeared — there was no way to step back to the last email of the prior batch. Fixed by having `checkForMoreEmails()` **append** the newly-fetched batch onto the emails already read this session (and point the position at the first new email) instead of **replacing** the whole list and resetting the position to 0. Now the prior batch stays in memory, so `canGoPrevious` is true on the first email of a new batch and "previous"/⏮️ steps back to the last email of the last batch; "next" then returns forward as expected. Reported by Alene.

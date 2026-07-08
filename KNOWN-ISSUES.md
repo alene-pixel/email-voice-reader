@@ -4,6 +4,25 @@ Newest entries at the top. This file tracks user-reported issues with the Voice 
 
 ---
 
+## 2026-07-07 — iPhone speech delay [OPEN] + double-command side effect [MITIGATED]
+
+**Reporter**: Alene.
+
+**Two linked issues:**
+
+**Issue 1 — the speech delay (OPEN, likely not fixable here).** On iPhone there is a lag between when Alene finishes speaking a command and when the app reacts. During that lag the app keeps reading aloud, which makes it feel like the app did not hear her.
+
+- **Root cause**: In command mode the app runs speech recognition with `continuous = false` and `interimResults = false` (see `SpeechService.initRecognition`). So the app is handed **nothing** until the recognizer decides the utterance is finished (its end-of-speech detection waits for a pause after she stops talking) and returns the single final result. Only when that final result arrives does `onresult` call `this.cancel()` to stop the reading. Everything between "she stops speaking" and "final result arrives" is the perceived delay, and the app is still reading during it.
+- **Why it is hard to remove**: The obvious speed-up is to turn on interim results in command mode and cancel the reading the instant ANY speech is detected. But the microphone also picks up the app's own text-to-speech, so interim results in command mode produce phantom commands from the app hearing itself. The app already added mic echo cancellation (commit `e7ad3e6`) and startup-echo guards (`f4bf530`) to fight this class of problem; a full interim-results command mode would reopen it. Treated as inherent to iOS Web Speech for now. Alene has accepted this ("it seemed to be unfixable, which is okay").
+
+**Issue 2 — the command ran twice (MITIGATED 2026-07-07).** Because of Issue 1, Alene sometimes said a command, thought it was not heard, and repeated it. The first command ran on the email she meant; the repeat then ran on the **next** email (which had already loaded and started reading), doing something she never wanted there — e.g. archiving an unheard email.
+
+- **Fix shipped**: A rapid-repeat guard, keyed on the command **id**. The controller remembers the last voice command it ran (`lastExecutedCommandId` / `lastExecutedCommandTime` in `handleCommand`). A pure pre-check, `shouldSuppressRepeat`, runs inside `SpeechService.onresult` **before** `this.cancel()`, via the `onCommandShouldSuppress` callback. If the same command id is heard again within `repeatCommandWindowMs` (default 3000 ms), it is ignored — and because the pre-check returns before `cancel()`, the email currently being read is **not** interrupted (no falling-silent). This is the voice analog of the on-screen button double-tap guard (`buttonsLockedUntil`, commit `543b507`). Full write-up: CHANGELOG.md, 2026-07-07.
+- **Only identical repeats are dropped.** A *different* command said right after always executes (keyed on id, not a blanket lock). For "next"/"previous" this is also the desired behavior — a repeated "next" during the delay now skips one email instead of two.
+- **Open tuning question (needs Alene's on-phone testing)**: Is 3000 ms the right window? Too long and it could swallow an *intended* quick second command; too short and a double still slips through when she waits longer before repeating. It is a single constant (`repeatCommandWindowMs`) in the controller constructor, easy to adjust. Cannot be verified from Claude's side — iOS speech timing is empirical, same loop as the Nilsson pronunciation work.
+
+---
+
 ## 2026-06-16 — "Nilsson" TTS pronunciation [REOPENED] — period form failed in-app; must tune in context
 
 **Status**: OPEN (reopened 2026-06-16). The period form `nill. sun` won in the standalone sandbox but REGRESSED to "neel-SUN" once live — the worst of both worlds (wrong vowel AND wrong stress). **Root cause**: the app speaks the surname mid-sentence ("Isabella nill. sun is …"), where the inserted period becomes an internal phrase break that flips both vowel and stress on the default voice; the sandbox had spoken the name in isolation / phrase-final and never surfaced this. App reverted to `nill sun` (short "i," stress slightly late) — the best in-app result so far. **Key lesson: tune candidates IN CONTEXT — embedded in a full sentence, processed the same way the app processes email text — not in isolation.** The sandbox (`nilsson-sandbox.html`) is being upgraded to do exactly that. **Next idea: `Nill's son`** (Isabella's — the surname derives from "Nils's son"; English possessive stress naturally falls on the first word, "NILL's son," which could fix the vowel and the stress at once).

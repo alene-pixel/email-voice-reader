@@ -1380,6 +1380,7 @@
                 this.recognition = null;
                 this.currentUtterance = null;
                 this.onCommand = null; // Callback when voice command is heard
+                this.onCommandShouldSuppress = null; // Pure pre-check: return true to ignore an accidental repeat WITHOUT cancelling ongoing speech
                 this.onInterimDictation = null; // Callback for interim dictation results
                 this.onFinalDictation = null; // Callback for final dictation results
                 this.dictationMode = false; // When true, use continuous + interim results
@@ -1443,6 +1444,15 @@
                             // Command mode: single final result
                             const command = event.results[0][0].transcript.trim();
                             console.log('Heard:', command);
+                            // Rapid-repeat guard: if this is an accidental repeat of the command
+                            // we just ran (user thought the app didn't hear them because of the
+                            // iPhone speech delay and said it again), ignore it — and skip cancel()
+                            // so the email currently being read keeps playing instead of the app
+                            // falling silent. See the double-command entry in KNOWN-ISSUES.md.
+                            if (this.onCommandShouldSuppress && this.onCommandShouldSuppress(command)) {
+                                console.log('Ignored rapid-repeat command:', command);
+                                return;
+                            }
                             this.cancel(); // Stop any ongoing speech
                             if (this.onCommand) this.onCommand(command);
                         }
@@ -2385,8 +2395,23 @@
                 // an unread email past the user.
                 this.buttonsLockedUntil = 0;
 
+                // Rapid-repeat voice guard (the voice analog of buttonsLockedUntil above).
+                // On iPhone there is a delay between when the user speaks and when the app
+                // reacts. During that delay the app keeps reading, so the user thinks it
+                // did not hear them and repeats the command. Without this guard the first
+                // command runs on the intended email AND the repeat runs on the NEXT email
+                // (e.g. archives an email the user never meant to touch). We remember the
+                // last voice command we actually ran; an identical command heard again
+                // within the window below is treated as an accidental repeat and ignored.
+                this.lastExecutedCommandId = null;
+                this.lastExecutedCommandTime = 0;
+                this.repeatCommandWindowMs = 3000; // Tunable: shrink if it eats intended repeats; grow if doubles still slip through
+
                 // Wire up speech recognition
                 this.speech.onCommand = (cmd) => this.handleCommand(cmd);
+                // Pure pre-check the SpeechService runs BEFORE it cancels ongoing speech,
+                // so a suppressed repeat leaves the current email reading uninterrupted.
+                this.speech.onCommandShouldSuppress = (cmd) => this.shouldSuppressRepeat(cmd);
 
                 // Wire up dictation callbacks
                 this.speech.onFinalDictation = (text) => this.handleDictationFinal(text);
@@ -2760,6 +2785,10 @@
                 const spokenLower = spokenCommand.toLowerCase();
                 for (const cmd of this.currentCommands || []) {
                     if (cmd.voiceMatch && cmd.voiceMatch(spokenLower)) {
+                        // Remember what we ran so an accidental repeat can be ignored
+                        // (see shouldSuppressRepeat and the rapid-repeat guard in the constructor).
+                        this.lastExecutedCommandId = cmd.id;
+                        this.lastExecutedCommandTime = Date.now();
                         cmd.execute();
                         return;
                     }
@@ -2772,6 +2801,24 @@
                     this.view.updateStatus('I heard you say:', `"${spokenCommand}" — Say "play" to continue`);
                 }
                 this.speech.speak('I did not understand that command. Please try again.');
+            }
+
+            // Pure pre-check (no side effects) used by SpeechService BEFORE it cancels
+            // ongoing speech. Returns true when the spoken words map to the SAME command
+            // we just executed, and that happened within repeatCommandWindowMs — i.e. an
+            // accidental rapid repeat caused by the iPhone speech delay. Matching the same
+            // way handleCommand does (first voiceMatch wins) keeps the two in lockstep, so
+            // the id compared here is exactly the command that would otherwise run.
+            shouldSuppressRepeat(spokenCommand) {
+                if (!this.lastExecutedCommandId) return false;
+                if (Date.now() - this.lastExecutedCommandTime > this.repeatCommandWindowMs) return false;
+                const spokenLower = spokenCommand.toLowerCase();
+                for (const cmd of this.currentCommands || []) {
+                    if (cmd.voiceMatch && cmd.voiceMatch(spokenLower)) {
+                        return cmd.id === this.lastExecutedCommandId;
+                    }
+                }
+                return false; // No command matched, or a different command — let it through
             }
 
             // Match spoken words against a list of recipients
