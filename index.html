@@ -2448,7 +2448,10 @@
                     {
                         id: 'markread', icon: '✓', label: 'Mark as Read',
                         voiceMatch: (cmd) => this.matchMarkAsRead(cmd),
-                        isAvailable: () => m.hasEmail && ['reading', 'idle'].includes(m.state),
+                        // Include 'reading-attachment' so the button stays visible AND the voice
+                        // command still works while an attachment is being read aloud — Alene may
+                        // want to mark the email as read part-way through the attachment.
+                        isAvailable: () => m.hasEmail && ['reading', 'idle', 'reading-attachment'].includes(m.state),
                         execute: () => this.markAsRead()
                     },
                     {

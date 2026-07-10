@@ -4,6 +4,18 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-07-09 — Keep "Mark as Read" available while an attachment is being read aloud
+
+**Summary**: When the app was reading an attachment out loud, the "Mark as Read" button disappeared and the spoken "mark as read" command stopped working. Alene wanted to be able to mark the email as read part-way through hearing the attachment — by tapping the button or by voice. Both now work throughout attachment reading. Requested by Alene.
+
+**How it works**: The `markread` command's `isAvailable()` gate previously listed only the `reading` and `idle` states; during attachment playback the app's state is `reading-attachment`, so the command dropped out. Added `'reading-attachment'` to that list — one array element. Because both the on-screen buttons (`renderCommands`) and the voice matcher (`handleCommand` iterating `this.currentCommands`) draw from the same `isAvailable()`-filtered set, the single change restores the button AND the voice command together. This mirrors what the Leap, Retreat, and Stop commands already do — they were the only commands available during `reading-attachment` before this change. `markAsRead()` itself needed no change: it acts on `this.model.currentEmail` (the email the attachment belongs to), and advancing to the next email resets `attachmentDisplayText`, so it behaves the same whether invoked during `reading` or `reading-attachment`. The voice path also inherits the existing interrupt pattern (Archive/Spam already call `speak()` right after a command cancels ongoing TTS; `speak()` resets the cancel flag at its start).
+
+**Verification**: `node --check` syntax pass on the main inline script. Traced the button-render path (`updateView` → `renderCommands` → `getAvailableCommands`) and the voice path (`SpeechService.onresult` → `handleCommand` → `currentCommands`) to confirm both gate on `isAvailable()`. Live behavior on Alene's iPhone is the real test, as always.
+
+**Reported by**: Alene.
+
+---
+
 ## 2026-07-09 — Pronounce "@altacpa.com" addresses as "at Alta C. P. A. dot com"
 
 **Summary**: Alta CPA Group is LIC's audit firm, and its people email from `@altacpa.com` (e.g. Carrie Schenker, Jamie Griffith). The reader was running the domain together as one mangled word. Now it says "Alta C P A" — the word "Alta" followed by the three spelled-out letters — so `carrie@altacpa.com` reads aloud as "carrie at Alta C P A dot com." Requested by Alene.
