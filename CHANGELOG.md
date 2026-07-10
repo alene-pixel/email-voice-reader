@@ -4,6 +4,16 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-07-09 — Pronounce "@altacpa.com" addresses as "at Alta C. P. A. dot com"
+
+**Summary**: Alta CPA Group is LIC's audit firm, and its people email from `@altacpa.com` (e.g. Carrie Schenker, Jamie Griffith). The reader was running the domain together as one mangled word. Now it says "Alta C P A" — the word "Alta" followed by the three spelled-out letters — so `carrie@altacpa.com` reads aloud as "carrie at Alta C P A dot com." Requested by Alene.
+
+**How it works**: Added one entry to `LIC_PRONUNCIATION_REPLACEMENTS`: `'altacpa': 'Alta C. P. A.'`. This reuses the exact pattern the `legalimpactforchickens` entry already relies on. `formatTextForSpeech()` runs first and turns `carrie@altacpa.com` into `carrie at altacpa dot com` (splitting off the `.com`), so by the time the dictionary runs in `speakChunk()` the domain is a standalone `altacpa` token that the word-boundary match catches. The period+space letter form (`C. P. A.`) is the same trick the `USA` → `U. S. A.` entry uses to make the voice spell letters instead of saying a word. Case-insensitive, so `AltaCPA.com` works too, and it also fires when `altacpa.com` appears as a plain website (the website regex splits it the same way).
+
+**Verification**: `node --check` syntax pass on the main inline script, plus a standalone simulation of `formatTextForSpeech()` + `applyLICDictionary()` on four inputs (email, website, mixed case, sentence-ending) — all produced "Alta C. P. A. dot com" in the right place. Whether iOS TTS actually spells the letters cleanly is not testable from Claude's side; it follows the proven `USA` format, but if it needs tuning Alene will hear it in the app (same empirical loop as the Nilsson pronunciation).
+
+---
+
 ## 2026-07-07 — Ignore an accidental repeat of a voice command (fixes the "did it twice" bug)
 
 **Summary**: On iPhone there is a delay between when Alene speaks and when the app reacts (root cause in KNOWN-ISSUES.md, 2026-07-07 entry — inherent to iOS speech recognition, not fixable here). During that delay the app keeps reading, so Alene often thinks it did not hear her and repeats the command. The first command then ran on the intended email AND the repeat ran on the NEXT email — e.g. archiving an email she never meant to touch. Now, if the app hears the **same** command again within a short window after running it, it treats the repeat as accidental and ignores it. This is the voice analog of the existing button double-tap guard (`buttonsLockedUntil`).
