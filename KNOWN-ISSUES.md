@@ -4,6 +4,24 @@ Newest entries at the top. This file tracks user-reported issues with the Voice 
 
 ---
 
+## 2026-07-12 — App "kinda freezes" on iPhone [FIX SHIPPED — awaiting on-phone confirmation]
+
+**Reporter**: Alene (reported 2026-07-10; diagnosed and fixed 2026-07-12).
+
+**Symptom**: Intermittent freezing on iPhone, in BOTH Safari and Chrome. Two observed forms: (1) stuck forever on the "Fetching your emails... One moment please" startup screen — Alene heard the "Let me check your inbox" line, then nothing; (2) reads one-to-a-few emails, then freezes right after a command like archive or mark-as-read. "It just kinda stops."
+
+**Ruled out during diagnosis**: GitHub outage (status page all-operational; app served fine). Recent code changes (the two 2026-07-09 commits were one-line, safe). Phone memory (a full power-off/on restart did not fix it). Internet connection (same freeze on Wi-Fi and cellular; ordinary Google search worked throughout). Gmail outage (Google Workspace Status Dashboard showed Gmail fully operational).
+
+**Root cause (confirmed by code trace)**: iOS/WebKit `speechSynthesis` intermittently plays an utterance but never fires its `end` event. `speakChunk()` resolved its Promise only on `onend`/`onerror`, so a missing `end` hung the `await` in `speak()` forever. Since the app finishes speaking before the next step, the chained work never ran — at startup the inbox fetch (chained in `speak().then()` inside `onMicSelected`) never started; mid-session the post-command advance (`archiveEmail`/`markAsRead`/`markAsSpam`, which `await speak(confirmation)`) never ran. Explains all of: both browsers (shared WebKit speech engine), restart-proof (timing bug not memory), internet-irrelevant (never a network hang).
+
+**Fix shipped 2026-07-12** (CHANGELOG has the full write-up): a watchdog timer in `speakChunk()`. `onend`, `onerror`, and a fallback `setTimeout` all funnel through one `finish()` guarded by a `settled` flag, so the Promise always settles once. Timer delay `Math.max(5000, speechText.length * 100)` ms — generous enough not to clip real speech, only bites on a genuine hang. On a hang the app now continues instead of freezing.
+
+**Why still OPEN, not RESOLVED**: TTS timing is device-specific and Claude cannot hear/drive Alene's iPhone, so confirmation requires her testing in the live app after the GitHub Pages redeploy (same empirical loop as the Nilsson pronunciation work). Mark RESOLVED once Alene confirms the freezing is gone.
+
+**If it still freezes after this fix**: next suspect is the Gmail API calls in `fetchWithAuth` (`fetchUnreadEmails`, `modifyEmail`), which also have NO per-call timeout — a stalled network request there would hang the same way. Deliberately left unchanged in the 2026-07-12 fix to keep it surgical and because attachment transfers legitimately need long timeouts (a blanket abort on `fetchWithAuth` could break large-attachment reads). If needed, add per-call timeouts via `AbortController` — short for list/modify, long for `getAttachment`.
+
+---
+
 ## 2026-07-07 — iPhone speech delay [OPEN] + double-command side effect [MITIGATED]
 
 **Reporter**: Alene.

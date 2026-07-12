@@ -1696,10 +1696,35 @@
                     this.currentUtterance.pitch = 1.0;
                     this.currentUtterance.volume = 1.0;
 
-                    this.currentUtterance.onend = () => resolve();
-                    this.currentUtterance.onerror = () => resolve();
+                    // WATCHDOG (2026-07-12): On iOS/WebKit — which is what BOTH Safari and
+                    // Chrome use on iPhone — speechSynthesis intermittently plays the audio
+                    // but never fires 'end' (or 'error'). Without a fallback this Promise
+                    // never resolves, so the await in speak() hangs forever and the whole app
+                    // freezes. At startup that looks like being stuck on "Fetching your
+                    // emails..." (the inbox fetch is chained after the welcome line resolves);
+                    // mid-session it looks like freezing right after a command such as archive
+                    // or mark-as-read (their confirmation speak() never returns). A one-shot
+                    // guard guarantees this Promise settles exactly once, whichever fires first.
+                    let settled = false;
+                    let watchdogTimer = null;
+                    const finish = () => {
+                        if (settled) return;
+                        settled = true;
+                        if (watchdogTimer) clearTimeout(watchdogTimer);
+                        resolve();
+                    };
+
+                    this.currentUtterance.onend = finish;
+                    this.currentUtterance.onerror = finish;
 
                     this.synthesis.speak(this.currentUtterance);
+
+                    // Fallback timer: resolve anyway if 'end' never arrives. The delay is a
+                    // generous upper bound on how long this chunk should take to speak
+                    // (~100 ms/char is well slower than real speech at rate 1.0), so it does
+                    // not cut off legitimate speech — it only fires when the engine has hung.
+                    const estimatedSpeakMs = Math.max(5000, speechText.length * 100);
+                    watchdogTimer = setTimeout(finish, estimatedSpeakMs);
 
                     // Chrome/mobile bug workaround - resume if paused
                     setTimeout(() => {

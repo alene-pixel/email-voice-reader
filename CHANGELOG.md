@@ -4,6 +4,22 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-07-12 — Speech watchdog: stop the app freezing when iOS speech never says "done"
+
+**Summary**: Alene reported the app "kinda freezes" intermittently on her iPhone — in BOTH Safari and Chrome. The most visible form was getting stuck forever on the "Fetching your emails... One moment please" startup screen; an earlier form was reading a few emails and then freezing right after a command like archive or mark-as-read. A phone restart did not fix it, switching between Wi-Fi and cellular did not fix it, and ordinary internet (Google search) worked the whole time. GitHub and Gmail were both confirmed fully operational that day, ruling out an outage.
+
+**Root cause**: The iOS/WebKit `speechSynthesis` engine (used by every iPhone browser, Safari and Chrome alike) intermittently plays an utterance's audio but never fires its `end` event. `speakChunk()` returned a Promise that resolved ONLY on `onend`/`onerror`, with no fallback — so a missing `end` left the Promise pending forever, and the `await` in `speak()` hung. Because the app is structured to finish speaking before doing the next step, whatever was chained after that speech never ran:
+- **Startup freeze**: `onMicSelected()` speaks "Let me check your inbox," and the inbox fetch (`fetchUnreadEmails()`) is chained inside `speak().then(...)`. A hung welcome utterance means the fetch never starts — so it sits on "Fetching your emails..." even though the inbox loads fine. The classic iOS manifestation is that the audio DID play (Alene heard the welcome line), yet `end` never fired.
+- **Mid-session freeze**: `archiveEmail()` / `markAsRead()` / `markAsSpam()` each `await this.speech.speak('Email archived.'/…)` before advancing. A hung confirmation utterance freezes the command.
+
+**Fix**: Added a watchdog timer to `speakChunk()`. `onend`, `onerror`, and the timer all funnel through a single `finish()` guarded by a `settled` flag, so the Promise resolves exactly once no matter which fires first. The timer delay is a generous per-chunk upper bound — `Math.max(5000, speechText.length * 100)` ms (~100 ms/char is well slower than real speech at rate 1.0), so it does not clip legitimate speech; it only bites when the engine has actually hung. When it bites, the app simply continues to the next step instead of freezing — at startup it proceeds to fetch email; mid-session it advances to the next email. Worst case is a rare slightly-clipped confirmation line, which browsers queue rather than cut off. All existing speech behavior is otherwise unchanged.
+
+**Verification**: `node --check` syntax pass on the main inline script. Traced every freeze symptom to a `speak()`/`speakChunk()` await with no fallback resolve. Live behavior on Alene's iPhone is the real test, as always — if it still freezes after this, the next suspect is the Gmail API calls in `fetchWithAuth`, which also lack per-call timeouts (deliberately not changed here to keep this fix surgical and because attachments legitimately need long transfers).
+
+**Reported by**: Alene.
+
+---
+
 ## 2026-07-09 — Keep "Mark as Read" available while an attachment is being read aloud
 
 **Summary**: When the app was reading an attachment out loud, the "Mark as Read" button disappeared and the spoken "mark as read" command stopped working. Alene wanted to be able to mark the email as read part-way through hearing the attachment — by tapping the button or by voice. Both now work throughout attachment reading. Requested by Alene.
