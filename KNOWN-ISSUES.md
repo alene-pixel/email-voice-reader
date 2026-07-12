@@ -23,9 +23,16 @@ Newest entries at the top. This file tracks user-reported issues with the Voice 
 
 **Where it points now**: a SILENT stall in the post-sign-in path that every device shares — the inbox fetch (`fetchWithAuth` has NO per-request timeout, so any stalled request hangs forever) or the auth / token / Google Identity Services layer. Cross-device + tiny emails + internet-up + Gmail-up + unchanged app path together point away from app logic and email content, toward the account/auth/Google side or a network-level stall on one request.
 
-**Next diagnostic steps (not yet done)**:
-1. Instrument the startup path with a visible step-by-step progress readout (e.g. "Signing in…", "Fetching list…", "Fetching email 3 of 10…", "Reading…") so the frozen screen itself reveals the exact stall point — the reliable way to localize a SILENT hang without needing browser DevTools. (Alternative: capture the desktop browser console.) Remove the readout once localized.
-2. Once localized, add per-call timeouts to `fetchWithAuth` via `AbortController` (short for list/modify, long for `getAttachment`) so a stalled request becomes a visible, recoverable error instead of an infinite freeze.
+**Leading hypothesis (2026-07-12)**: the freeze leaves the *pre-fetch* status showing, so execution hangs in `onMicSelected`'s chain BEFORE the inbox fetch returns — i.e. `speak()` (welcome), `setMicDevice()` (getUserMedia claim of the chosen mic), or the fetch itself. The **mic-claim step is a strong suspect**: it runs right after the welcome and calls getUserMedia, which a recent OS/browser security update could have started blocking or hanging; it fits cross-device + sudden onset, and the Claude Browser-pane mic-block popups drew attention to it. (Speech-hang is not fully excluded — the reverted watchdog may simply never have loaded, due to GitHub Pages caching during Alene's test.)
+
+**Diagnostic build DEPLOYED 2026-07-12**: a TEMPORARY step-by-step progress readout in `onMicSelected` + `fetchUnreadEmails`. The second status line now names the current step — "Step 1 of 4: speaking welcome…", "Step 2 of 4: preparing microphone…", "Step 3 of 4: contacting Gmail… / loading email N of M…", "Step 4 of 4: starting to read…" — so whichever step is frozen on-screen pinpoints the stall. Also `console.log`'d with a `[startup]` prefix. AWAITING Alene's on-device report of the frozen step.
+
+**Then — targeted fix by step** (and remove the diagnostic readout as part of it):
+- Step 1 (speech): decouple the inbox fetch from the welcome speech so a hung utterance can't block it (more robust than the reverted watchdog).
+- Step 2 (mic): timeout `setMicDevice`/getUserMedia and make a blocked/failed mic non-fatal — fall back to the default mic and proceed to the fetch.
+- Step 3 (fetch): per-call timeouts on `fetchWithAuth` via `AbortController` (short for list/modify, long for `getAttachment`), so a stalled request becomes a visible, recoverable error instead of an infinite freeze.
+
+**Also observed 2026-07-12 (Claude Browser pane, a quirky env — treat as a weak signal)**: visual stuck on "Fetching" while audio read ahead; after "mark as read" the confirmation fired (button turned purple, spoken) but the app did not advance to the next email. Hints at a view-render desync separate from the startup hang; revisit only if the step readout doesn't explain the real-device freeze.
 
 **Status**: OPEN. Do not mark resolved until Alene confirms on-device.
 
