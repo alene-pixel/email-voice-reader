@@ -4,23 +4,30 @@ Newest entries at the top. This file tracks user-reported issues with the Voice 
 
 ---
 
-## 2026-07-12 — App "kinda freezes" on iPhone [FIX SHIPPED — awaiting on-phone confirmation]
+## 2026-07-12 — App freezes on iPhone AND desktop [OPEN — cause not yet found]
 
-**Reporter**: Alene (reported 2026-07-10; diagnosed and fixed 2026-07-12).
+**Reporter**: Alene (onset ~July 7–10, 2026; fine for months before). Reported 2026-07-10; investigated 2026-07-12.
 
-**Symptom**: Intermittent freezing on iPhone, in BOTH Safari and Chrome. Two observed forms: (1) stuck forever on the "Fetching your emails... One moment please" startup screen — Alene heard the "Let me check your inbox" line, then nothing; (2) reads one-to-a-few emails, then freezes right after a command like archive or mark-as-read. "It just kinda stops."
+**Symptom**: Intermittent freeze, on iPhone (both Safari and Chrome) AND on desktop. Most consistent form: stuck indefinitely on the startup screen "Fetching your emails... One moment please," right after the spoken "Let me check your inbox." Earlier form: reads one-to-a-few emails, then freezes right after a command like archive or mark-as-read. "It kinda freezes / just stops." **No error is shown** — so it is a SILENT hang on an unresolved `await`, not a thrown exception (the `try/catch` in `onMicSelected` would otherwise display "Could not fetch emails").
 
-**Ruled out during diagnosis**: GitHub outage (status page all-operational; app served fine). Recent code changes (the two 2026-07-09 commits were one-line, safe). Phone memory (a full power-off/on restart did not fix it). Internet connection (same freeze on Wi-Fi and cellular; ordinary Google search worked throughout). Gmail outage (Google Workspace Status Dashboard showed Gmail fully operational).
+**Ruled out (with method)**:
+- GitHub outage — status all-green; app serves fine (WebFetch of the live page).
+- Gmail outage — Google Workspace Status Dashboard all-green.
+- Connection — same freeze on Wi-Fi and cellular; ordinary Google search works throughout.
+- Phone memory — a full power-off/on restart did not help.
+- Stale cache — Alene cleared iPhone Safari history and reloaded; still froze (so she was running the newest code).
+- Recent app changes — the July 7–9 commits (repeat-guard `4c4bab3`, batch-memory `1cb34de`, matchArchive `c1002bf`, altacpa `883a865`, markread-during-attachment `514d240`) do NOT touch the startup / sign-in / fetch path. That path (`onMicSelected` → `fetchUnreadEmails` → `fetchWithAuth`) is unchanged for months.
+- Speech-hang theory — a `speakChunk()` watchdog was shipped (`1945575`) to force-resolve a hung utterance; it did NOT fix the freeze. Reverted per the bug-fix philosophy (don't leave an unsuccessful fix in the code). So this is NOT the iOS speechSynthesis `onend`-never-fires hang.
+- Big / malformed email — checked `sizeEstimate` of all 15 unread-in-inbox messages via the Gmail API on 2026-07-12: largest 0.25 MB, total 0.64 MB. No monster email; not a large-attachment stall.
+- iOS 26.5.2 (early-July 2026 security update) as the sole spark — weakened: desktop is not iOS, so an iOS-only update cannot be the whole story.
 
-**Root cause (confirmed by code trace)**: iOS/WebKit `speechSynthesis` intermittently plays an utterance but never fires its `end` event. `speakChunk()` resolved its Promise only on `onend`/`onerror`, so a missing `end` hung the `await` in `speak()` forever. Since the app finishes speaking before the next step, the chained work never ran — at startup the inbox fetch (chained in `speak().then()` inside `onMicSelected`) never started; mid-session the post-command advance (`archiveEmail`/`markAsRead`/`markAsSpam`, which `await speak(confirmation)`) never ran. Explains all of: both browsers (shared WebKit speech engine), restart-proof (timing bug not memory), internet-irrelevant (never a network hang).
+**Where it points now**: a SILENT stall in the post-sign-in path that every device shares — the inbox fetch (`fetchWithAuth` has NO per-request timeout, so any stalled request hangs forever) or the auth / token / Google Identity Services layer. Cross-device + tiny emails + internet-up + Gmail-up + unchanged app path together point away from app logic and email content, toward the account/auth/Google side or a network-level stall on one request.
 
-**Likely trigger for the sudden onset** (Alene asked the right question: months of working fine, then suddenly broken — why?). The vulnerable code is long-standing, so a new spark must have started tripping it. Best candidate: **iOS 26.5.2**, an unusual security-only emergency update (~30 fixes, no new features) Apple pushed to every iPhone (11 and newer) in early July 2026 — squarely in the onset window (Alene reported 2026-07-10). Security-only updates routinely change WebKit internals including `speechSynthesis`, with no user-visible note — same pattern as the Chrome 148 Speech-component security patches in the 2026-06-03 entry below. Corroboration: Safari 27 fixes a `speechSynthesis` bug tied to `cancel()` — the exact call `speak()` makes (index.html ~line 1721) — so WebKit speech is actively in flux this month. NOT confirmed on Alene's specific device (she can check Settings → General → About → Software Version for `26.5.2`); timing + mechanism fit. Either way the watchdog fix is trigger-independent. Sources: [Forbes on iOS 26.5.2](https://www.forbes.com/sites/davidphelan/2026/07/02/apples-latest-ios-2652-iphone-update-focuses-on-25-security-patches/); [The State of Speech Synthesis in Safari](https://weboutloud.io/bulletin/speech_synthesis_in_safari/).
+**Next diagnostic steps (not yet done)**:
+1. Instrument the startup path with a visible step-by-step progress readout (e.g. "Signing in…", "Fetching list…", "Fetching email 3 of 10…", "Reading…") so the frozen screen itself reveals the exact stall point — the reliable way to localize a SILENT hang without needing browser DevTools. (Alternative: capture the desktop browser console.) Remove the readout once localized.
+2. Once localized, add per-call timeouts to `fetchWithAuth` via `AbortController` (short for list/modify, long for `getAttachment`) so a stalled request becomes a visible, recoverable error instead of an infinite freeze.
 
-**Fix shipped 2026-07-12** (CHANGELOG has the full write-up): a watchdog timer in `speakChunk()`. `onend`, `onerror`, and a fallback `setTimeout` all funnel through one `finish()` guarded by a `settled` flag, so the Promise always settles once. Timer delay `Math.max(5000, speechText.length * 100)` ms — generous enough not to clip real speech, only bites on a genuine hang. On a hang the app now continues instead of freezing.
-
-**Why still OPEN, not RESOLVED**: TTS timing is device-specific and Claude cannot hear/drive Alene's iPhone, so confirmation requires her testing in the live app after the GitHub Pages redeploy (same empirical loop as the Nilsson pronunciation work). Mark RESOLVED once Alene confirms the freezing is gone.
-
-**If it still freezes after this fix**: next suspect is the Gmail API calls in `fetchWithAuth` (`fetchUnreadEmails`, `modifyEmail`), which also have NO per-call timeout — a stalled network request there would hang the same way. Deliberately left unchanged in the 2026-07-12 fix to keep it surgical and because attachment transfers legitimately need long timeouts (a blanket abort on `fetchWithAuth` could break large-attachment reads). If needed, add per-call timeouts via `AbortController` — short for list/modify, long for `getAttachment`.
+**Status**: OPEN. Do not mark resolved until Alene confirms on-device.
 
 ---
 
