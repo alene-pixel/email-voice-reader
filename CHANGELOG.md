@@ -4,6 +4,22 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-07-12 — Fix the whole-app freeze ("Page Unresponsive") caused by a large HTML email
+
+**Summary**: Alene reported the app freezing for days on every device (iPhone Safari + Chrome, Mac Chrome) — sometimes stuck on "Fetching your emails…", sometimes freezing after reading a few emails. A desktop screenshot showed Chrome's "Page Unresponsive" dialog and an "Aw, Snap! RESULT_CODE_HUNG" crash, meaning the JavaScript main thread was blocked by a synchronous runaway loop — not a network or speech stall (which is what the earlier investigation had chased; see KNOWN-ISSUES.md for the full trail, including a speech-watchdog fix that was tried and reverted because it did not help).
+
+**Root cause**: catastrophic regex backtracking (ReDoS) in `EmailUtils.getEmailBody()`. The leftover-CSS cleanup `/[a-z-]+\s*:\s*[^;]+\s*!important\s*;?/gi` has an unbounded `[^;]+\s*!important` that, on a large HTML body, scans from every position for an `!important` that may not exist, backtracking super-linearly until the tab hangs. A ~99 KB Zoom webinar-reminder email that arrived ~July 8 (and contained no `!important` at all) triggered it — which is why the app "worked for months, then suddenly broke." The same email hangs on every device; all of Alene's other unread mail is small plaintext and unaffected.
+
+**How it was pinned down**: fetched all 15 of Alene's actual unread emails and ran the exact JS processing pipeline on each with per-step timing. The 99 KB HTML email hung precisely at the `!important` step; every step before it finished in 0–1 ms, and every other email finished in ≤1 ms.
+
+**Fix**: bound the value scan so the match stays linear — `/[a-z-]+\s*:\s*[^;]{0,200}!important[^;]{0,40};?/gi`. CSS values are short, so `{0,200}`/`{0,40}` never clips a real declaration, and the engine can no longer run away. Verified on the real inbox: the offending body dropped from an infinite hang to **28 ms**, all 15 emails now process cleanly, and a normal `color: red !important;` is still stripped. One-line change (index.html ~line 1199). The temporary startup progress-readout scaffolding added earlier the same day (to localize the freeze) was removed as part of this.
+
+**Verification**: `node --check` syntax pass; full-pipeline timing harness over all 15 real unread emails (0 hangs, max 28 ms). On-device confirmation from Alene still pending, as always.
+
+**Reported by**: Alene.
+
+---
+
 ## 2026-07-09 — Keep "Mark as Read" available while an attachment is being read aloud
 
 **Summary**: When the app was reading an attachment out loud, the "Mark as Read" button disappeared and the spoken "mark as read" command stopped working. Alene wanted to be able to mark the email as read part-way through hearing the attachment — by tapping the button or by voice. Both now work throughout attachment reading. Requested by Alene.

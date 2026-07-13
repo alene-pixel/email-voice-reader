@@ -1188,7 +1188,15 @@
                 body = body.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
                 body = body.replace(/<[^>]*>/g, '');
                 body = body.replace(/\{[^}]*\}/g, '');
-                body = body.replace(/[a-z-]+\s*:\s*[^;]+\s*!important\s*;?/gi, '');
+                // Remove leftover "property: value !important;" CSS declarations. The value
+                // scan is BOUNDED ({0,200}/{0,40}) on purpose: the old unbounded form
+                // /[a-z-]+\s*:\s*[^;]+\s*!important\s*;?/ catastrophically backtracked and
+                // hung the whole page (Chrome "Page Unresponsive" / RESULT_CODE_HUNG) on large
+                // HTML emails — e.g. a ~99KB Zoom reminder that contained NO "!important" at
+                // all, so [^;]+ scanned the entire body from every position looking for a match
+                // that never came. Bounding the scan keeps it linear. Fixed 2026-07-12,
+                // verified against Alene's real inbox (81KB email: infinite hang -> 28ms).
+                body = body.replace(/[a-z-]+\s*:\s*[^;]{0,200}!important[^;]{0,40};?/gi, '');
                 // Decode HTML entities (both named like &nbsp; and numeric like &#847; or &#x20;)
                 body = body.replace(/&#(\d+);/g, (match, dec) => {
                     const char = String.fromCharCode(dec);
@@ -1985,8 +1993,7 @@
                 return response;
             }
 
-            async fetchUnreadEmails(maxResults = 10, onProgress = null) {
-                if (onProgress) onProgress('requesting inbox list…');
+            async fetchUnreadEmails(maxResults = 10) {
                 const response = await this.fetchWithAuth(
                     `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread in:inbox&maxResults=${maxResults}`
                 );
@@ -1994,9 +2001,7 @@
                 if (!data.messages) return [];
 
                 const emails = [];
-                for (let i = 0; i < data.messages.length; i++) {
-                    const msg = data.messages[i];
-                    if (onProgress) onProgress(`loading email ${i + 1} of ${data.messages.length}…`);
+                for (let msg of data.messages) {
                     try {
                         const emailResponse = await this.fetchWithAuth(
                             `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`
@@ -3164,32 +3169,19 @@
 
                 // Update UI immediately
                 this.model.setState('loading');
-                // TEMPORARY diagnostic progress readout (2026-07-12): the second status line
-                // names the current startup step, so if the app freezes the screen shows the
-                // exact stall point. Steps: 1 speak welcome, 2 claim mic, 3 contact Gmail,
-                // 4 start reading. Remove once the freeze is localized. See KNOWN-ISSUES.md.
-                this.view.updateStatus('Fetching your emails...', 'Step 1 of 4: speaking welcome…');
-                console.log('[startup] Step 1: speaking welcome');
+                this.view.updateStatus('Fetching your emails...', 'One moment please');
 
                 // CRITICAL: This synchronous speech.speak() call unlocks iOS audio.
                 // Do NOT add any await/async before this line!
                 this.speech.speak('Welcome to Voice Email Reader! Let me check your inbox.').then(async () => {
-                    this.view.updateStatus('Fetching your emails...', 'Step 2 of 4: preparing microphone…');
-                    console.log('[startup] Step 2: preparing microphone (deviceId=' + deviceId + ')');
                     // Claim the chosen mic before speech recognition starts
                     if (deviceId && deviceId !== 'default') {
                         await this.speech.setMicDevice(deviceId);
                     }
-                    this.view.updateStatus('Fetching your emails...', 'Step 3 of 4: contacting Gmail…');
-                    console.log('[startup] Step 3: contacting Gmail');
                     try {
-                        // Fetch emails (the callback updates the on-screen step for each request)
-                        const emails = await this.gmail.fetchUnreadEmails(10, (msg) => {
-                            this.view.updateStatus('Fetching your emails...', 'Step 3 of 4: ' + msg);
-                            console.log('[startup] Step 3: ' + msg);
-                        });
+                        // Fetch emails
+                        const emails = await this.gmail.fetchUnreadEmails();
                         this.model.setEmails(emails);
-                        console.log('[startup] fetched ' + emails.length + ' emails');
 
                         if (emails.length === 0) {
                             this.view.updateStatus('No unread emails', 'Your inbox is empty!');

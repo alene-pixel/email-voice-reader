@@ -4,37 +4,24 @@ Newest entries at the top. This file tracks user-reported issues with the Voice 
 
 ---
 
-## 2026-07-12 — App freezes on iPhone AND desktop [OPEN — cause not yet found]
+## 2026-07-12 — App freezes ("Page Unresponsive") on a large HTML email [FIXED — awaiting on-device confirmation]
 
-**Reporter**: Alene (onset ~July 7–10, 2026; fine for months before). Reported 2026-07-10; investigated 2026-07-12.
+**Reporter**: Alene (onset ~July 7–10, 2026; fine for months before). Reported 2026-07-10; root cause found and fixed 2026-07-12.
 
-**Symptom**: Intermittent freeze, on iPhone (both Safari and Chrome) AND on desktop. Most consistent form: stuck indefinitely on the startup screen "Fetching your emails... One moment please," right after the spoken "Let me check your inbox." Earlier form: reads one-to-a-few emails, then freezes right after a command like archive or mark-as-read. "It kinda freezes / just stops." **No error is shown** — so it is a SILENT hang on an unresolved `await`, not a thrown exception (the `try/catch` in `onMicSelected` would otherwise display "Could not fetch emails").
+**Symptom**: Intermittent freeze on every device (iPhone Safari, iPhone Chrome, Mac Chrome). Sometimes stuck on the "Fetching your emails…" startup screen; sometimes read a few emails then froze on archive/mark-as-read. The decisive clue came from a desktop screenshot: Chrome's **"Page Unresponsive"** dialog and an **"Aw, Snap! RESULT_CODE_HUNG"** crash page — i.e. the JS **main thread was blocked by a synchronous infinite/near-infinite loop**, not a stuck network/await.
 
-**Ruled out (with method)**:
-- GitHub outage — status all-green; app serves fine (WebFetch of the live page).
-- Gmail outage — Google Workspace Status Dashboard all-green.
-- Connection — same freeze on Wi-Fi and cellular; ordinary Google search works throughout.
-- Phone memory — a full power-off/on restart did not help.
-- Stale cache — Alene cleared iPhone Safari history and reloaded; still froze (so she was running the newest code).
-- Recent app changes — the July 7–9 commits (repeat-guard `4c4bab3`, batch-memory `1cb34de`, matchArchive `c1002bf`, altacpa `883a865`, markread-during-attachment `514d240`) do NOT touch the startup / sign-in / fetch path. That path (`onMicSelected` → `fetchUnreadEmails` → `fetchWithAuth`) is unchanged for months.
-- Speech-hang theory — a `speakChunk()` watchdog was shipped (`1945575`) to force-resolve a hung utterance; it did NOT fix the freeze. Reverted per the bug-fix philosophy (don't leave an unsuccessful fix in the code). So this is NOT the iOS speechSynthesis `onend`-never-fires hang.
-- Big / malformed email — checked `sizeEstimate` of all 15 unread-in-inbox messages via the Gmail API on 2026-07-12: largest 0.25 MB, total 0.64 MB. No monster email; not a large-attachment stall.
-- iOS 26.5.2 (early-July 2026 security update) as the sole spark — weakened: desktop is not iOS, so an iOS-only update cannot be the whole story.
+**Root cause (confirmed by reproducing on Alene's real inbox)**: catastrophic regex backtracking (ReDoS) in `EmailUtils.getEmailBody()`, the HTML→text cleanup. The line that stripped leftover `!important` CSS was `/[a-z-]+\s*:\s*[^;]+\s*!important\s*;?/gi`. On a large HTML email the unbounded `[^;]+\s*!important` scans from every position for an `!important` that may not exist, backtracking super-linearly. A **~99 KB Zoom webinar-reminder email** (which arrived ~July 8 and contained **zero** `!important`) hung it outright — that newly-arrived email is why "worked for months, then broke." Same email → hangs on every device. Every other unread email is small plaintext and fine.
 
-**Where it points now**: a SILENT stall in the post-sign-in path that every device shares — the inbox fetch (`fetchWithAuth` has NO per-request timeout, so any stalled request hangs forever) or the auth / token / Google Identity Services layer. Cross-device + tiny emails + internet-up + Gmail-up + unchanged app path together point away from app logic and email content, toward the account/auth/Google side or a network-level stall on one request.
+**How it was found**: fetched all 15 unread emails' actual bodies and ran the exact JS pipeline on each with per-step timing. Email [0] (99 KB HTML) hung at the `!important` step; steps before it finished in 0–1 ms; every other email finished in ≤1 ms. (Scripts: `scratchpad/fetch_all_unread.py` + `test_all.js` + `test_pipeline.js` in the session's scratchpad.)
 
-**Leading hypothesis (2026-07-12)**: the freeze leaves the *pre-fetch* status showing, so execution hangs in `onMicSelected`'s chain BEFORE the inbox fetch returns — i.e. `speak()` (welcome), `setMicDevice()` (getUserMedia claim of the chosen mic), or the fetch itself. The **mic-claim step is a strong suspect**: it runs right after the welcome and calls getUserMedia, which a recent OS/browser security update could have started blocking or hanging; it fits cross-device + sudden onset, and the Claude Browser-pane mic-block popups drew attention to it. (Speech-hang is not fully excluded — the reverted watchdog may simply never have loaded, due to GitHub Pages caching during Alene's test.)
+**Fix (shipped 2026-07-12)**: bound the value scan so it stays linear —
+`/[a-z-]+\s*:\s*[^;]{0,200}!important[^;]{0,40};?/gi`. Verified on the real inbox: the 81 KB post-tag-strip body went from an infinite hang to **28 ms**, all 15 emails process cleanly, and a normal `color: red !important;` is still stripped correctly. One-line change at index.html ~line 1199.
 
-**Diagnostic build DEPLOYED 2026-07-12**: a TEMPORARY step-by-step progress readout in `onMicSelected` + `fetchUnreadEmails`. The second status line now names the current step — "Step 1 of 4: speaking welcome…", "Step 2 of 4: preparing microphone…", "Step 3 of 4: contacting Gmail… / loading email N of M…", "Step 4 of 4: starting to read…" — so whichever step is frozen on-screen pinpoints the stall. Also `console.log`'d with a `[startup]` prefix. AWAITING Alene's on-device report of the frozen step.
+**Ruled out along the way** (kept for reference): GitHub outage, Gmail outage, connection (same on Wi-Fi + cellular; Google search worked), phone memory (restart didn't help), stale cache (cleared, still froze), a speech-hang (a `speakChunk` watchdog was tried and reverted — did not fix it), a huge *attachment* (all messages < 0.25 MB by `sizeEstimate` — but that measures the raw message, not the 99 KB decoded HTML body the app actually processes), and iOS 26.5.2 as the sole spark (desktop isn't iOS). The real trigger was a large HTML *body*, not attachment size.
 
-**Then — targeted fix by step** (and remove the diagnostic readout as part of it):
-- Step 1 (speech): decouple the inbox fetch from the welcome speech so a hung utterance can't block it (more robust than the reverted watchdog).
-- Step 2 (mic): timeout `setMicDevice`/getUserMedia and make a blocked/failed mic non-fatal — fall back to the default mic and proceed to the fetch.
-- Step 3 (fetch): per-call timeouts on `fetchWithAuth` via `AbortController` (short for list/modify, long for `getAttachment`), so a stalled request becomes a visible, recoverable error instead of an infinite freeze.
+**If a similar hang recurs**: suspect another synchronous regex over the email body. The other HTML-cleanup regexes in `getEmailBody` (`<style>`/`<script>`/tag/`{…}`/entity strips) and the speech `formatTextForSpeech` domain/email regexes were all measured safe on the real inbox, but a differently-shaped email could expose one — re-run the per-email pipeline timing harness.
 
-**Also observed 2026-07-12 (Claude Browser pane, a quirky env — treat as a weak signal)**: visual stuck on "Fetching" while audio read ahead; after "mark as read" the confirmation fired (button turned purple, spoken) but the app did not advance to the next email. Hints at a view-render desync separate from the startup hang; revisit only if the step readout doesn't explain the real-device freeze.
-
-**Status**: OPEN. Do not mark resolved until Alene confirms on-device.
+**Status**: FIXED. Mark RESOLVED once Alene confirms the big Zoom email (and normal reading) works on her phone.
 
 ---
 
