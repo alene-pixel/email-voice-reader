@@ -4,6 +4,26 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-07-13 — Fix the remaining intermittent freeze: re-apply the speech watchdog
+
+**Summary**: After the 2026-07-12 ReDoS fix, the app still froze intermittently ("comes and goes") — most often stuck on "Archiving email…" after an archive command, sometimes on "Fetching your emails…". Captured live twice, once with the DevTools console open on Mac Chrome.
+
+**Root cause**: `speakChunk()` returned a Promise that resolved only on the utterance's `onend`/`onerror`, with **no timeout**. When the browser's `speechSynthesis` wedges — plays or silently drops audio but never fires `onend`/`onerror`, a known WebKit/Chrome failure mode made likelier by the heavy cancel/restart churn a voice session produces — the Promise never settled, so the `await` in `speak()`/`speakWithScroll()` hung forever and froze the whole app. Startup froze on "Fetching…" (the inbox fetch is chained after the welcome line's `speak`); commands froze after their spoken confirmation.
+
+**Why it "worked for months, then broke"**: the no-timeout code is old (predates 2026) and always vulnerable; it only bites when the engine actually wedges. A browser/OS speech-engine change in early July (Chrome auto-update on the Mac; iOS 26.5.2 on iPhone) made wedging frequent enough to surface daily. The app's own code did not change.
+
+**How it was pinned down**: (1) proved it is NOT email content — the whole real inbox processes through the full text pipeline in <50 ms per email. (2) The DevTools console during a live freeze showed the app stuck right after an archive command's spoken confirmation, with the speech/mic subsystem thrashing (bursts of `no-speech`, wake-lock cycling). (3) `speakChunk` has no timeout on the utterance events.
+
+**Fix**: re-apply the watchdog from commit `1945575` — `onend`, `onerror`, and a fallback timer all funnel through one `settled`-guarded `finish()`, so the Promise always settles exactly once. Timer = `Math.max(5000, len*100)` ms, slower than real speech, so it only fires on a genuine hang. This fix was first added 2026-07-12 and reverted (`0719cfe`) as "did not fix the freeze" — a misdiagnosis: the ReDoS bug was still live then and froze the app before speech ran, masking the watchdog. With the ReDoS fixed (`34be2aa`), the watchdog addresses the remaining freeze. There were two independent freeze bugs.
+
+**Known separate issue (NOT fixed here)**: `fetchWithAuth` never refreshes the OAuth token and never checks `response.ok`, so ~1 hour after sign-in, Gmail actions (archive/send) can silently fail. Tracked for a follow-up so this freeze fix can be tested in isolation.
+
+**Verification**: syntax-checked the inline script with `node --check`. On-device confirmation from Alene is pending and, because the freeze is intermittent, means "normal use over the coming days without a freeze," not an instant proof.
+
+**Reported by**: Alene.
+
+---
+
 ## 2026-07-12 — Fix the whole-app freeze ("Page Unresponsive") caused by a large HTML email
 
 **Summary**: Alene reported the app freezing for days on every device (iPhone Safari + Chrome, Mac Chrome) — sometimes stuck on "Fetching your emails…", sometimes freezing after reading a few emails. A desktop screenshot showed Chrome's "Page Unresponsive" dialog and an "Aw, Snap! RESULT_CODE_HUNG" crash, meaning the JavaScript main thread was blocked by a synchronous runaway loop — not a network or speech stall (which is what the earlier investigation had chased; see KNOWN-ISSUES.md for the full trail, including a speech-watchdog fix that was tried and reverted because it did not help).

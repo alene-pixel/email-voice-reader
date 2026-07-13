@@ -1704,10 +1704,44 @@
                     this.currentUtterance.pitch = 1.0;
                     this.currentUtterance.volume = 1.0;
 
-                    this.currentUtterance.onend = () => resolve();
-                    this.currentUtterance.onerror = () => resolve();
+                    // WATCHDOG (re-applied 2026-07-13): speechSynthesis intermittently plays
+                    // (or silently drops) audio but never fires 'end' or 'error'. Seen on iOS
+                    // WebKit (Safari + Chrome on iPhone) AND on desktop Chrome (a captured freeze
+                    // on Alene's Mac confirmed it), and it gets likelier after the heavy
+                    // cancel/restart churn a voice session produces. speakChunk used to resolve
+                    // ONLY on onend/onerror, so a missing 'end' left this Promise pending forever
+                    // and the await in speak()/speakWithScroll() hung the whole app — startup
+                    // stuck on "Fetching your emails..." (the inbox fetch is chained after the
+                    // welcome line) and commands stuck after their spoken confirmation (e.g.
+                    // "Archiving email..."). The fallback timer guarantees this Promise always
+                    // settles; a settled flag funnels onend/onerror/timer through finish() once.
+                    //
+                    // History: first added 2026-07-12 (commit 1945575), then reverted (0719cfe)
+                    // as "did not fix the freeze" — that was a misdiagnosis: the ReDoS bug in
+                    // getEmailBody() was still live then and froze the app BEFORE speech ran,
+                    // masking this fix. The ReDoS is fixed (34be2aa), so this is re-applied.
+                    // Do NOT remove without a replacement timeout — without it the app freezes
+                    // forever on a hung utterance. See FREEZE-INVESTIGATION-2026-07.md.
+                    let settled = false;
+                    let watchdogTimer = null;
+                    const finish = () => {
+                        if (settled) return;
+                        settled = true;
+                        if (watchdogTimer) clearTimeout(watchdogTimer);
+                        resolve();
+                    };
+
+                    this.currentUtterance.onend = finish;
+                    this.currentUtterance.onerror = finish;
 
                     this.synthesis.speak(this.currentUtterance);
+
+                    // Fallback timer: resolve anyway if 'end' never arrives. The delay is a
+                    // generous upper bound on how long this chunk should take to speak
+                    // (~100 ms/char is well slower than real speech at rate 1.0), so it does not
+                    // cut off legitimate speech — it only fires when the engine has hung.
+                    const estimatedSpeakMs = Math.max(5000, speechText.length * 100);
+                    watchdogTimer = setTimeout(finish, estimatedSpeakMs);
 
                     // Chrome/mobile bug workaround - resume if paused
                     setTimeout(() => {
