@@ -4,6 +4,24 @@ Newest entries at the top. This file tracks user-reported issues with the Voice 
 
 ---
 
+## 2026-07-13 — App freezes on "Archiving email…" / "Fetching…" — speech engine hang [FIXED — awaiting on-device confirmation]
+
+**Reporter**: Alene. After the 2026-07-12 ReDoS fix (below), the freeze kept happening intermittently ("comes and goes"). This was a **second, independent** freeze bug; the 2026-07-12 entry fixed only the first (a large-email regex hang).
+
+**Symptom**: Intermittent freeze on all devices, most often stuck on "Archiving email…" right after an archive command (the email sometimes did, sometimes did not actually archive), sometimes on the "Fetching your emails…" startup screen. Captured live twice, once with the DevTools console open on Mac Chrome — the console showed the app stalled right after a command's spoken confirmation, with the speech/mic subsystem thrashing (bursts of `no-speech`, wake-lock cycling).
+
+**Root cause**: `speakChunk()` resolved its Promise ONLY on the utterance's `onend`/`onerror`, with **no timeout**. When the browser's `speechSynthesis` wedges (plays or silently drops audio but never fires `onend`/`onerror` — a known WebKit/Chrome failure mode, likelier after the heavy cancel/restart churn a voice session produces), the Promise never settles, so the `await` in `speak()`/`speakWithScroll()` hangs forever and freezes the whole app. Startup freeze = the welcome line's `speak` hangs and the chained inbox fetch never runs; command freeze = the confirmation `speak` hangs.
+
+**Why "worked for months, then broke"**: the no-timeout code is old and always vulnerable; it only bites when the engine actually wedges. A browser/OS speech change in early July made wedging frequent. iPhone Chrome + Safari share Apple's WebKit engine, so a single iOS update explains both iPhone browsers; the Mac-Chrome trigger is unconfirmed (see FREEZE-INVESTIGATION-2026-07.md).
+
+**Fix (shipped 2026-07-13, commit `2ff6e38`)**: re-applied the `speakChunk` watchdog (from `1945575`) — `onend`, `onerror`, and a fallback timer funnel through one `settled`-guarded `finish()`, so the Promise always settles; timer `Math.max(5000, len*100)` ms is slower than real speech, so it only fires on a genuine hang. That watchdog was first added 2026-07-12 and reverted (`0719cfe`) as "did not fix the freeze" — a **misdiagnosis**: the ReDoS bug was still live then and froze the app before speech ran, masking it. With the ReDoS fixed (`34be2aa`), the watchdog addresses this second freeze.
+
+**Known separate issue (NOT fixed here)**: `fetchWithAuth` never refreshes the OAuth token and never checks `response.ok`, so ~1 hour after sign-in Gmail actions (archive/send) can silently fail. Tracked for a follow-up. Interim workaround: reload the app after a long session.
+
+**Status**: FIXED. Mark RESOLVED once Alene confirms via normal use over several days with no freeze (intermittent → no instant proof). Full investigation and open items: `FREEZE-INVESTIGATION-2026-07.md` (a local, gitignored working doc, not published).
+
+---
+
 ## 2026-07-12 — App freezes ("Page Unresponsive") on a large HTML email [FIXED — awaiting on-device confirmation]
 
 **Reporter**: Alene (onset ~July 7–10, 2026; fine for months before). Reported 2026-07-10; root cause found and fixed 2026-07-12.
@@ -17,7 +35,7 @@ Newest entries at the top. This file tracks user-reported issues with the Voice 
 **Fix (shipped 2026-07-12)**: bound the value scan so it stays linear —
 `/[a-z-]+\s*:\s*[^;]{0,200}!important[^;]{0,40};?/gi`. Verified on the real inbox: the 81 KB post-tag-strip body went from an infinite hang to **28 ms**, all 15 emails process cleanly, and a normal `color: red !important;` is still stripped correctly. One-line change at index.html ~line 1199.
 
-**Ruled out along the way** (kept for reference): GitHub outage, Gmail outage, connection (same on Wi-Fi + cellular; Google search worked), phone memory (restart didn't help), stale cache (cleared, still froze), a speech-hang (a `speakChunk` watchdog was tried and reverted — did not fix it), a huge *attachment* (all messages < 0.25 MB by `sizeEstimate` — but that measures the raw message, not the 99 KB decoded HTML body the app actually processes), and iOS 26.5.2 as the sole spark (desktop isn't iOS). The real trigger was a large HTML *body*, not attachment size.
+**Ruled out along the way** (kept for reference): GitHub outage, Gmail outage, connection (same on Wi-Fi + cellular; Google search worked), phone memory (restart didn't help), stale cache (cleared, still froze), a huge *attachment* (all messages < 0.25 MB by `sizeEstimate` — but that measures the raw message, not the 99 KB decoded HTML body the app actually processes), and iOS 26.5.2 as the sole spark (desktop isn't iOS). The real trigger was a large HTML *body*, not attachment size. **CORRECTION (2026-07-13)**: the speech-hang was NOT actually ruled out here. The `speakChunk` watchdog tried this day "did not fix the freeze" only because THIS ReDoS bug was still live and masked it — the speech-hang was a real, independent SECOND freeze bug. See the 2026-07-13 entry above.
 
 **If a similar hang recurs**: suspect another synchronous regex over the email body. The other HTML-cleanup regexes in `getEmailBody` (`<style>`/`<script>`/tag/`{…}`/entity strips) and the speech `formatTextForSpeech` domain/email regexes were all measured safe on the real inbox, but a differently-shaped email could expose one — re-run the per-email pipeline timing harness.
 
