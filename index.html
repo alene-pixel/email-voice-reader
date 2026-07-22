@@ -669,6 +669,7 @@
             'green fire': 'Greenfire'
         };
         const LIC_PRONUNCIATION_REPLACEMENTS = {
+            'LIC': 'lick',  // say "lick" (the org's name), not the spelled-out letters "L-I-C". Matched case-insensitively at word boundaries, so "LIC", "lic", and the possessive "LIC's" -> "lick"/"licks"; embedded letters like "public"/"license"/"explicit" are untouched (no word boundary).
             'Blome': 'Bloom',  // say "Bloom", not "Blome"
             'USA': 'U. S. A.',  // spell out the letters, don't say "oosa"
             'legalimpactforchickens': 'Legal Impact for Chickens',  // say the four words, not the run-together domain. formatTextForSpeech() already turns "alene@legalimpactforchickens.org" into "alene at legalimpactforchickens dot org" before this runs, so this catches the standalone token.

@@ -4,6 +4,18 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-07-22 — Pronounce "LIC" as "lick" when reading emails aloud
+
+**Summary**: Added `'LIC': 'lick'` to the `LIC_PRONUNCIATION_REPLACEMENTS` map so the text-to-speech reader says the org's name ("lick") instead of spelling out the letters "L-I-C". This was already the documented example in the comment above the map, but the entry itself had never been added — verified via `git log -S` that no prior `'LIC': 'lick'` line ever existed, so nothing was being undone.
+
+**Behavior**: Matching is case-insensitive at word boundaries (the map's existing `applyLICDictionary` logic), so "LIC", "lic", and the possessive "LIC's" become "lick"/"licks". Embedded letters — "public", "license", "explicit", "italic", "policy" — are untouched because there's no word boundary around the internal "lic". Affects only the spoken audio; the on-screen email text is unchanged.
+
+**Verification**: extracted the inline scripts and syntax-checked with `node --check` (OK). On-device confirmation from Alene pending (Claude can't hear her iPhone's voice — same empirical loop as the Nilsson pronunciation work).
+
+**Requested by**: Alene.
+
+---
+
 ## 2026-07-13 — Fix the remaining intermittent freeze: re-apply the speech watchdog
 
 **Summary**: After the 2026-07-12 ReDoS fix, the app still froze intermittently ("comes and goes") — most often stuck on "Archiving email…" after an archive command, sometimes on "Fetching your emails…". Captured live twice, once with the DevTools console open on Mac Chrome.
