@@ -645,8 +645,9 @@
         // This block customizes spelling and pronunciation for words
         // specific to Legal Impact for Chickens (LIC). To make the app
         // generic for other users, delete this entire block (and the
-        // two applyLICDictionary calls in onresult and speakChunk) —
-        // no other code changes needed.
+        // two applyLICDictionary calls in onresult and speakChunk, plus
+        // the applyLegalPronunciations call at the top of
+        // formatTextForSpeech) — no other code changes needed.
         //
         // DICTATION_REPLACEMENTS: when speech recognition hears the
         // KEY, write the VALUE instead. Matched case-insensitively at
@@ -658,6 +659,14 @@
         // right. Matched case-insensitively at word boundaries.
         //   Example: "LIC" → "lick" so the reader says "lick" not
         //   "L-I-C"
+        //
+        // LEGAL_PRONUNCIATIONS: legal-citation abbreviations that must be
+        // rewritten BEFORE the email/website-domain regexes in
+        // formatTextForSpeech run — otherwise those regexes mangle any
+        // citation with internal periods (e.g. "S.Ct." → "S dot Ct.").
+        // So these are applied via applyLegalPronunciations() at the top
+        // of formatTextForSpeech, not in speakChunk like the dictionary
+        // above.  Example: "S.Ct." → "Supreme Court".
         // ============================================================
         const LIC_DICTATION_REPLACEMENTS = {
             'ashley': 'Ashely',
@@ -685,6 +694,44 @@
                 const pattern = new RegExp(`\\b${escaped}\\b`, 'gi');
                 result = result.replace(pattern, value);
             }
+            return result;
+        }
+
+        // Legal-citation abbreviations, keyed by how they appear in text.
+        // Applied by applyLegalPronunciations() at the TOP of
+        // formatTextForSpeech (before the email/domain regexes). Both the
+        // unspaced form Alene types (e.g. "S.Ct.") and the spaced Bluebook
+        // form courts and Westlaw use (e.g. "S. Ct.") are included.
+        const LIC_LEGAL_PRONUNCIATIONS = {
+            'S.Ct.': 'Supreme Court',                // Supreme Court Reporter, e.g. "112 S.Ct. 2130"
+            'S. Ct.': 'Supreme Court',               // spaced Bluebook form of the same
+            'L.Ed.2d': "lawyers' edition second",    // Lawyers' Edition, Second Series, e.g. "119 L.Ed.2d 351"
+            'L. Ed. 2d': "lawyers' edition second",  // spaced Bluebook form of the same
+            'Lujan': 'Loohahn'                       // surname (as in Lujan v. Defenders of Wildlife); say "Loo-hahn"
+        };
+
+        function applyLegalPronunciations(text) {
+            if (!text) return text;
+            let result = text;
+            for (const [key, value] of Object.entries(LIC_LEGAL_PRONUNCIATIONS)) {
+                const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                // Anchor a word boundary (\b) only on an edge that is itself a
+                // word character. A key ending in "." (like "S.Ct.") can't take a
+                // trailing \b — \b never matches between "." and a following
+                // space or end-of-string, so a trailing \b would block the whole
+                // match. All existing keys start/end on word chars, so this is a
+                // no-op for them and only relaxes the trailing-period keys.
+                const left  = /\w/.test(key[0])              ? '\\b' : '';
+                const right = /\w/.test(key[key.length - 1]) ? '\\b' : '';
+                result = result.replace(new RegExp(`${left}${escaped}${right}`, 'gi'), value);
+            }
+            // "n." → "note", scoped to the legal footnote pattern ONLY: a
+            // LOWERCASE "n." immediately followed by a footnote number, so
+            // "n.5" and "n. 5" → "note 5". Deliberately case-sensitive and
+            // number-gated: a blanket "n." → "note" would also rewrite capital
+            // "N." (North, middle initials) — e.g. "John N. Smith" or
+            // "123 N. Main St." — because the reader speaks names and addresses.
+            result = result.replace(/\bn\.\s?(\d)/g, 'note $1');
             return result;
         }
         // ============================================================
@@ -1657,6 +1704,10 @@
             // Preprocess text for natural TTS pronunciation
             // Must be called BEFORE splitIntoSentences so email dots aren't treated as sentence boundaries
             formatTextForSpeech(text) {
+                // Legal-citation pronunciations FIRST — before the domain/email
+                // regexes below, which would otherwise mangle citations with
+                // internal periods (e.g. "S.Ct." → "S dot Ct.").
+                text = applyLegalPronunciations(text);
                 // Replace email addresses for natural pronunciation
                 // e.g., "user@gmail.com" → "user at gmail dot com"
                 text = text.replace(
