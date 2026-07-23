@@ -4,6 +4,20 @@ Newest entries at the top. The Voice Email Reader was built before this changelo
 
 ---
 
+## 2026-07-23 — Speak legal citations aloud (S.Ct., L.Ed.2d, Lujan, n.)
+
+**Summary**: Added a legal-citation pronunciation pass so the reader says citations naturally: `S.Ct.` → "Supreme Court", `L.Ed.2d` → "lawyers' edition second", `Lujan` → "Loohahn" (as in *Lujan v. Defenders of Wildlife*), and footnote `n.5` → "note 5". Both the unspaced forms Alene types and the spaced Bluebook forms courts/Westlaw use (`S. Ct.`, `L. Ed. 2d`) are handled.
+
+**Why it needed a new mechanism (not just a dictionary line)**: two things blocked the obvious approach. (1) `formatTextForSpeech`'s website-domain regex runs first and mangles any citation with internal periods — verified `"S.Ct."` → `"S dot Ct."` and `"L.Ed.2d"` → `"L dot Ed.2d"` before a pronunciation replacement could ever see them. (2) The existing `applyLICDictionary` wraps keys in `\b...\b`; a key ending in "." (like `S.Ct.`) can't take a trailing `\b` (it never matches between "." and a following space/end), so it silently failed to match — verified on raw text. Fix: a new `applyLegalPronunciations()` applied at the **top** of `formatTextForSpeech`, before the domain/email regexes, using a smart boundary that only anchors `\b` on an edge that is a word character.
+
+**The "n." → "note" scoping decision**: scoped to the footnote pattern only — a **lowercase** `n.` immediately followed by a number (`n.5`, `n. 5` → "note 5"). Deliberately case-sensitive and number-gated so capital `N.` (North, middle initials) in the names and addresses the reader speaks is left untouched — e.g. "John N. Smith" and "123 N. Main St." stay as-is. A blanket `n.` → "note" would have rewritten those.
+
+**Verification**: built a node test battery of real citations (incl. the full *Lujan* cite with `S.Ct.`, `L.Ed.2d`, and `U.S.` in one line) plus false-positive traps (middle initials, "N. Main St.", "N. Korea", emails, domains) — all correct; then re-ran the functions extracted verbatim from `index.html`. On-device confirmation from Alene pending (Claude can't hear her iPhone's voice — same empirical loop as the Nilsson pronunciation work; the "Loohahn" spelling in particular may want an in-context listen).
+
+**Requested by**: Alene.
+
+---
+
 ## 2026-07-22 — Pronounce "LIC" as "lick" when reading emails aloud
 
 **Summary**: Added `'LIC': 'lick'` to the `LIC_PRONUNCIATION_REPLACEMENTS` map so the text-to-speech reader says the org's name ("lick") instead of spelling out the letters "L-I-C". This was already the documented example in the comment above the map, but the entry itself had never been added — verified via `git log -S` that no prior `'LIC': 'lick'` line ever existed, so nothing was being undone.
